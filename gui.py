@@ -3,6 +3,11 @@ import tkinter.filedialog as filedialog
 import tkinter.simpledialog as simpledialog
 import os
 from PIL import ImageTk, Image
+from pathlib import PurePath
+
+from threading import Thread
+
+import mos_select_data
 
 """
 Changelog by Bryce, Nov 25:
@@ -32,31 +37,35 @@ background_image = scripts_path+"1_crop.png"
 ###
 os.chdir(scripts_path)  
  
-def select_brain():
-    global brain_file
-    global subject_ID
-    brain_file = filedialog.askopenfile(initialdir="/", title="Select T1 Image",
-                                      filetypes=(("Brain", ".nii"), ("All Files", "*.*")))
-    subject_ID = simpledialog.askstring("Input", "What is this file's subject ID?")
+def select_data():
 
-def select_coordinates():
-    global coordinates
-    coordinates = filedialog.askopenfile(initialdir="/", title="Select Brainsight Coordinates",
-                                      filetypes=(("Coordinates", ".xlsx"), ("All Files", "*.*")))
+    mos_select_data.main() 
+
+    # set up gui
+    
+    # launch gui
+    
+    # button to close gui
+    
+    # check if returned input is valid
+
+    # return variables to main gui here
+
+
+
+    # # from Neuro Nexus version importing matlab processing
+    # import mosaics_analysis
+    # print('ready to run script with subprocess.run!')
+    # mosaics_analysis.main(brain_file.name, coordinates.name, subject_ID, scripts_path)
 
 def call_mosaics():
     print('ready to run script with subprocess.run!')
-    mosaics_analysis.main(brain_file.name, coordinates.name, subject_ID, scripts_path)
+    # mosaics_analysis.main(brain_file.name, coordinates.name, subject_ID, scripts_path)
     
     # below code were part of my experiments but I don't think I need it anymore, leaving for now though
     #mosaics_python_path = os.path.join(os.getcwd(),"mosaics_analysis.py")
     #run("Python3", mosaics_python_path, brain_file.name, coordinates.name)
     #run(["Python3", "{}".format(self.path)])
-
-def select_save_dir():
-    save_dir = filedialog.askdirectory(initialdir="/", title="Where should we save files?")
-    os.chdir(save_dir)
-    print("MOSAICS files will be saved in: "+save_dir)
 
 def configure_gui(frame):
     frame.title("MOSAICS 2020")
@@ -82,33 +91,33 @@ def create_widgets(frame):
     frame.grid_rowconfigure(0, weight=1)
     frame.grid_rowconfigure(5, weight=1)
     
-    select_brain_button = tk.Button(frame,
+    button_select_data = tk.Button(frame,
                                     text="Select data for analysis",
                                     padx=15,
                                     pady=5,
-                                    command=select_brain)
-    select_brain_button.grid(row=1)
+                                    command=select_data)
+    button_select_data.grid(row=1)
     
-    select_coordinates_button = tk.Button(frame,
-                                          text="Upload landmark coordinates (*.xlsx)",
-                                          padx=15,
-                                          pady=5,
-                                          command=select_coordinates)
-    select_coordinates_button.grid(row=2)
+    # select_coordinates_button = tk.Button(frame,
+    #                                       text="Upload landmark coordinates (*.xlsx)",
+    #                                       padx=15,
+    #                                       pady=5,
+    #                                       command=select_coordinates)
+    # select_coordinates_button.grid(row=2)
     
-    save_dir_button = tk.Button(frame,
-                                text="Select directory to save files",
-                                padx=15,
-                                pady=5, 
-                                command=select_save_dir)
-    save_dir_button.grid(row=3)
+    # save_dir_button = tk.Button(frame,
+    #                             text="Select directory to save files",
+    #                             padx=15,
+    #                             pady=5, 
+    #                             command=select_save_dir)
+    # save_dir_button.grid(row=3)
     
     analysis_button = tk.Button(frame,
                                     text = "MOSAICS analysis",
                                     padx = 15,
                                     pady = 5,
                                     command = call_mosaics)
-    analysis_button.grid(row=4)
+    analysis_button.grid(row=3)
 
 if __name__ == '__main__':
     
