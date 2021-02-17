@@ -17,7 +17,6 @@ alone for now, it's a feature to polish.
 """
 extra functions list, outsource to their own scripts hey?
     skullstrip
-    warp to MNI
 """
 
 ##### Script initialization section #####
@@ -33,8 +32,8 @@ import nibabel as nib
 import pandas as pd
 import numpy as np
 from scipy import ndimage as ndi
-import logging
 from nipype.interfaces import fsl
+import logging
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -79,7 +78,6 @@ def main(data_dict, config_dict):
     # Create an array of zeroes equal to size of T1 image, to initialize our output images
     map_stims = np.zeros(data_T1.shape)
     map_samples = np.zeros(data_T1.shape)
-    map_dots = np.zeros(data_T1.shape)
     map_grid = np.zeros(data_T1.shape)
     
     # Put all MEP values in to the arrays of zeroes at their corresponding x,y,z coordinates
@@ -88,14 +86,12 @@ def main(data_dict, config_dict):
     for index, row in data_nibs_map.iterrows():
         map_stims[int(row[0]),int(row[1]),int(row[2])] = row[3]
         map_samples[int(row[0]),int(row[1]),int(row[2])] = row[3]
-        map_dots[int(row[0]),int(row[1]),int(row[2])] = row[3]
-        map_grid[int(row[0]),int(row[1]),int(row[2])] = 1
+        map_grid[int(row[0])-1,int(row[1])-1,int(row[2])-1] = 1
     
     # What are these maps (above)?
     #     - map_stims = MEP amplitude overlayed in an array the same size as the T1 image, dilated across 5 voxels
     #       (so 5mm isotropic) in the script
-    #     - map_samples = the same as overlay, but 3mm dilation instead of 5mm
-    #     - map_dots = the same as overlay but no dilation, so 1mm isotropic
+    #     - map_samples = the same as stims, but no dilation, so... 1mm isotropic?
     #     - map_grid = 'binary' mask, 0 or 99, which points had a stim? Originally 
     #       also points orthogonally adjacent to each stim point are 1 instead of 99.
     
@@ -109,22 +105,25 @@ def main(data_dict, config_dict):
     dilate_offset = (dilate-1)/2
     # for all rows with nonzero MEPs, duplicate their values over the neighbouring region, the number
     # of times the value is replicated is determined by the dilate variable, which must be odd.
-    for row in np.where(data_nibs_map[3] > 0)[0]:
-        x_lower = int(data_nibs_map[0][row]) - int(dilate_offset)
-        x_higher = int(data_nibs_map[0][row]) + int(dilate_offset) + 1
-        y_lower = int(data_nibs_map[1][row]) - int(dilate_offset)
-        y_higher = int(data_nibs_map[1][row]) + int(dilate_offset) + 1
-        z_lower = int(data_nibs_map[2][row]) - int(dilate_offset)
-        z_higher = int(data_nibs_map[2][row]) + int(dilate_offset) + 1
+    for row in np.where(data_nibs_map[3] > MEP_thresh)[0]:
+        x_lower = int(data_nibs_map[0][row]) - int(dilate_offset) - 1
+        x_higher = int(data_nibs_map[0][row]) + int(dilate_offset)
+        y_lower = int(data_nibs_map[1][row]) - int(dilate_offset) - 1
+        y_higher = int(data_nibs_map[1][row]) + int(dilate_offset)
+        z_lower = int(data_nibs_map[2][row]) - int(dilate_offset) - 1
+        z_higher = int(data_nibs_map[2][row]) + int(dilate_offset)
         map_stims[x_lower:x_higher,y_lower:y_higher,z_lower:z_higher] = data_nibs_map[3][row]
                 
     # Rotate matrices in the y dimension (AP) to convert from RPS (Brainsight) to RAS (Nifti)
     # RPS = +x is right, +y is posterior, +z is superior
     # RAS = +x is right, +y is anterior, +z is superior
-    map_stims = np.flip(map_stims,1)
-    map_samples = np.flip(map_samples,1)
-    # dotmap = np.flip(dotmap,1)
-    # grid = np.flip(grid,1)
+    if data_dict['stim_flip'] == 1:
+        logging.info('stim_flip == 1 check succeeded, flipping.')
+        map_stims = np.flip(map_stims,1)
+        map_samples = np.flip(map_samples,1)
+        map_grid = np.flip(map_grid,1)
+    else:
+        logging.info('stim_flip type is '+str(type(data_dict['stim_flip'])))
     
     
     # ~~~~~~CALCULATE METRICS~~~~~~
@@ -143,15 +142,25 @@ def main(data_dict, config_dict):
     #               Stimulations from experiment have been uniformaly dilated by the 'dilate' integer.
     # Heatmap:      Stimulations map with a gaussian filter applied to smooth the data
     
+    file_grid = os.getcwd()+'/outputs/'+save_prefix+'_grid.nii'
     file_hotspot = os.getcwd()+'/outputs/'+save_prefix+'_stimulations.nii'
     file_heatmap = os.getcwd()+'/outputs/'+save_prefix+'_heatmap.nii'
     
+    # Grid save
+    nii_grid = nib.Nifti1Image(map_grid, data_T1.affine)
+    if not os.path.exists(file_grid):
+        logging.info('...saving stimulation grid!')
+        nib.save(nii_grid, file_grid)
+    
+    
+    # Stimulations save
     # Nibabel save nifti only needs the image data and an affine, which we'll re-use from the T1 image
     nii_hotspot = nib.Nifti1Image(map_stims, data_T1.affine)
     if not os.path.exists(file_hotspot):
         logging.info('...saving hotspots!')
         nib.save(nii_hotspot, file_hotspot)
     
+    # Heatmap save
     # Smooth the hotspot map using a 3D Gaussian
     # Interestingly, FWHM = 2.355 * s.d. for Gaussian distribution, so divide smooth by 2.355 to get s.d.
     stdev_gaussian = smooth/2.355
@@ -161,10 +170,26 @@ def main(data_dict, config_dict):
         logging.info('...saving heatmap!')
         nib.save(nii_heatmap, file_heatmap)
 
+    # Make spreadsheet of values!
+
     """
     DEV NOTE:
         To do -> Save measures in spreadsheet  
     """
+    measures_dict = {'Participant':data_dict['save_prefix'],
+                    'Image File':data_dict['image'],
+                    'Stim file':data_dict['stim'],
+                    'MEP Threshold':config_dict['MEP_threshold'],
+                    'Hotspot X':results_hotspot[0],
+                    'Hotspot Y':results_hotspot[1],
+                    'Hotspot Z':results_hotspot[2],
+                    'Hotspot MEP':map_samples[np.unravel_index(np.argmax(map_samples), map_samples.shape)],
+                    'COG X':results_center_mass[0],
+                    'COG Y':results_center_mass[1],
+                    'COG Z':results_center_mass[2]}
+    measures_dataframe = pd.DataFrame(measures_dict, index=[0])
+    measures_file = os.getcwd()+'/outputs/'+data_dict['save_prefix']+'_results.xlsx'
+    measures_dataframe.to_excel(measures_file)
     
     
     # ~~~~~~NORMALIZE MAPS TO STANDARD SPACE~~~~~~

@@ -71,6 +71,9 @@ class MOSAICSapp(tk.Tk):
         self.gui_select_open = False
                 
         self.data_dict = dict()
+        self.data_dict['image_select_text'] = "No image specified"
+        self.data_dict['stim_select_text'] = "No stimulation data specified"
+        self.data_dict['stim_flip'] = 0 # tk.Checkbutton in gui_select
         self.data_dict['select gui open'] = False
         self.configure_dict = dict()
         # Set default variables for analysis, updated by guiConfigure class as desired
@@ -126,14 +129,14 @@ class guiSelect(tk.Toplevel):
                 
         self.window = tk.Toplevel(master)
         self.window.title("Select data")
-        self.window.geometry("300x220")
+        self.window.geometry("300x230")
         self.window.resizable(False,False)
         self.frame = tk.Frame(self.window)
         self.frame.pack(padx=10, pady=5)
         
-        # ~~~~~~Setup selection buttons and sane name entry field~~~~~~
+        # ~~~~~~CONFIGURE GUI OBJECTS (BUTTONS ETC)~~~~~~
         self.path_t1 = tk.Label(self.frame,
-                            text="No image specified",
+                            text=self.local_data['image_select_text'],
                             bg="white",
                             width=30,
                             relief="groove",
@@ -142,7 +145,7 @@ class guiSelect(tk.Toplevel):
                               text="Select structural image (*.nii(.gz))",
                               command = self.pick_t1)
         self.path_stim = tk.Label(self.frame,
-                            text="No stimulation data specified",
+                            text=self.local_data['stim_select_text'],
                             bg="white",
                             width=30,
                             relief="groove",
@@ -150,16 +153,23 @@ class guiSelect(tk.Toplevel):
         self.select_stim = tk.Button(self.frame,
                                 text="Select stimulation data file (*.xls(x))",
                                 command = self.pick_stim_data)
+        self.flip_stim = tk.Checkbutton(self.frame,text="Flip stim coordinates?",
+                                             variable=self.local_data['stim_flip'],command=self.toggle_flip)  
+        # set flip_stim check button depending upon its current value
+        if self.local_data['stim_flip'] == 1:
+            self.flip_stim.select()
+        elif self.local_data['stim_flip'] == 0:
+            self.flip_stim.deselect()
+
         self.list_save_name = tk.Label(self.frame,
                                   text="Enter save name prefix below:")
-        
         self.enter_save_name = tk.Entry(self.frame,
                                     relief="groove")
         
         self.close_button = tk.Button(self.frame,
                                   text="Submit",
                                   command = self.save_and_close)
-        
+
         # configure the grid
         self.frame.columnconfigure((0,1,2), weight=0)
         self.frame.rowconfigure((0,1,2,3,4,5,6), weight=0)
@@ -169,9 +179,10 @@ class guiSelect(tk.Toplevel):
         self.select_t1.grid(row=1, column=0, sticky="w")
         self.path_stim.grid(row=2, pady = 4, columnspan=3, sticky="w")
         self.select_stim.grid(row=3, column=0, sticky="w")
-        self.list_save_name.grid(row=4, column=0, sticky="w")
-        self.enter_save_name.grid(row=5, column=0, columnspan=2, sticky="w")
-        self.close_button.grid(row=6, column=0, sticky="e")
+        self.flip_stim.grid(row=4, column=0, sticky="w")
+        self.list_save_name.grid(row=5, column=0, sticky="w")
+        self.enter_save_name.grid(row=6, column=0, columnspan=2, sticky="w")
+        self.close_button.grid(row=7, column=0, sticky="e")
 
     def pick_t1(self):
         file_nii = filedialog.askopenfilename(initialdir="~/",
@@ -180,6 +191,7 @@ class guiSelect(tk.Toplevel):
         p = PurePath(file_nii)
         # update the text field to reflect user chosen file
         self.path_t1.config(text=p.anchor+'...'+p.name)
+        self.local_data['image_select_text'] = p.anchor+'...'+p.name
         
         # bring this value back to the main GUI right away, so it's not lost due to scope
         self.local_data['image'] = file_nii
@@ -193,8 +205,16 @@ class guiSelect(tk.Toplevel):
         self.path_stim.config(text=p.anchor+'...'+p.name)
         
         # bring this value back to the main GUI right away, so it's not lost due to scope
+        self.local_data['stim_select_text'] = p.anchor+'...'+p.name
         self.local_data['stim'] = file_stim
     
+    def toggle_flip(self):
+        if self.local_data['stim_flip'] == 0:
+            self.local_data['stim_flip'] = 1
+        elif self.local_data['stim_flip'] == 1:
+            self.local_data['stim_flip'] = 0
+
+
     # button to close gui
     def save_and_close(self):
         
@@ -238,7 +258,7 @@ class guiConfigure(tk.Toplevel):
         self.frame.pack(padx=10, pady=5)
         
         # entry field for dilation
-        self.dilate_label = tk.Label(self.frame, text="Stim. data dilation (mm):")
+        self.dilate_label = tk.Label(self.frame, text="Stim. data dilation (odd integer):")
         self.dilate_form = tk.Entry(self.frame,width=5,relief="groove",justify='center')
         self.dilate_form.insert(0,str(self.local_data['dilate']))
         # entry field for smooth
