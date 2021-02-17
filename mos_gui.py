@@ -74,6 +74,8 @@ class MOSAICSapp(tk.Tk):
         self.data_dict['image_select_text'] = "No image specified"
         self.data_dict['stim_select_text'] = "No stimulation data specified"
         self.data_dict['stim_flip'] = 0 # tk.Checkbutton in gui_select
+        self.data_dict['save_dir'] = os.getcwd()
+        self.data_dict['save_prefix'] = 'outputs'
         self.data_dict['select gui open'] = False
         self.configure_dict = dict()
         # Set default variables for analysis, updated by guiConfigure class as desired
@@ -129,7 +131,7 @@ class guiSelect(tk.Toplevel):
                 
         self.window = tk.Toplevel(master)
         self.window.title("Select data")
-        self.window.geometry("300x230")
+        self.window.geometry("300x280")
         self.window.resizable(False,False)
         self.frame = tk.Frame(self.window)
         self.frame.pack(padx=10, pady=5)
@@ -160,12 +162,19 @@ class guiSelect(tk.Toplevel):
             self.flip_stim.select()
         elif self.local_data['stim_flip'] == 0:
             self.flip_stim.deselect()
-
+        self.path_save = tk.Label(self.frame,
+                            text='...'+self.local_data['save_dir'].split('/')[-2]+'/'+self.local_data['save_dir'].split('/')[-1],
+                            bg="white",
+                            width=30,
+                            relief="groove",
+                            borderwidth=2)
+        self.select_save = tk.Button(self.frame,
+                                text="Select save directory",
+                                command = self.set_save_dir)
         self.list_save_name = tk.Label(self.frame,
                                   text="Enter save name prefix below:")
         self.enter_save_name = tk.Entry(self.frame,
                                     relief="groove")
-        
         self.close_button = tk.Button(self.frame,
                                   text="Submit",
                                   command = self.save_and_close)
@@ -180,9 +189,11 @@ class guiSelect(tk.Toplevel):
         self.path_stim.grid(row=2, pady = 4, columnspan=3, sticky="w")
         self.select_stim.grid(row=3, column=0, sticky="w")
         self.flip_stim.grid(row=4, column=0, sticky="w")
-        self.list_save_name.grid(row=5, column=0, sticky="w")
-        self.enter_save_name.grid(row=6, column=0, columnspan=2, sticky="w")
-        self.close_button.grid(row=7, column=0, sticky="e")
+        self.path_save.grid(row=5, column=0, columnspan=3, sticky="w")
+        self.select_save.grid(row=6,column=0, sticky="w")
+        self.list_save_name.grid(row=7, column=0, sticky="w")
+        self.enter_save_name.grid(row=8, column=0, columnspan=2, sticky="w")
+        self.close_button.grid(row=9, column=0, sticky="e")
 
     def pick_t1(self):
         file_nii = filedialog.askopenfilename(initialdir="~/",
@@ -214,6 +225,11 @@ class guiSelect(tk.Toplevel):
         elif self.local_data['stim_flip'] == 1:
             self.local_data['stim_flip'] = 0
 
+    def set_save_dir(self):
+        save_dir = filedialog.askdirectory(initialdir=self.local_data['save_dir'],
+                                           title="Select directory to save output files")
+        self.path_save.config(text='...'+save_dir.split('/')[-2]+'/'+save_dir.split('/')[-1])
+        self.local_data['save_dir'] = save_dir
 
     # button to close gui
     def save_and_close(self):
@@ -272,6 +288,11 @@ class guiConfigure(tk.Toplevel):
         # checkbox for normalise or no?
         self.normalise_bool = tk.Checkbutton(self.frame,text="Warp to standard atlas?",
                                              variable=self.local_data['normalize'], command=self.warp_check)
+        # set flip_stim check button depending upon its current value
+        if self.local_data['normalize'] == 1:
+            self.normalise_bool.select()
+        elif self.local_data['normalize'] == 0:
+            self.normalise_bool.deselect()
         # if checkbox is checked, pick a standard atlas to use:
         self.normalise_atlas = tk.Label(self.frame,text="./"+str(self.local_data['atlas']),
                                         relief="groove",borderwidth=2, width=22)#width=30

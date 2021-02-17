@@ -44,6 +44,8 @@ def main(data_dict, config_dict):
     file_t1 = str(data_dict['image'])
     # stimulation spreadsheet
     file_nibs_map = str(data_dict['stim'])
+    # save directory
+    save_dir = str(data_dict['save_dir'])
     # save prefix
     save_prefix = str(data_dict['save_prefix'])
     
@@ -57,8 +59,8 @@ def main(data_dict, config_dict):
     if int(config_dict['normalize']) == 1:
         file_atlas = str(config_dict['atlas'])
 
-    # Create output directory
-    os.makedirs(os.getcwd()+'/outputs/',exist_ok=True)
+    # # Create output directory
+    # os.makedirs(os.getcwd()+'/outputs/',exist_ok=True)
     
     
     # ~~~~~~LOAD DATA~~~~~~
@@ -135,23 +137,21 @@ def main(data_dict, config_dict):
     # MAP CENTER OF GRAVITY
     # convenient method from scipy / ndimage (imported as ndi)
     results_center_mass = ndi.measurements.center_of_mass(map_samples)
-    
-    
+
+
     # ~~~~~~SAVE FILES~~~~~~
     # Stimulations: Main output, MEP amplitudes within a matrix sized to match structural image.
     #               Stimulations from experiment have been uniformaly dilated by the 'dilate' integer.
     # Heatmap:      Stimulations map with a gaussian filter applied to smooth the data
-    
-    file_grid = os.getcwd()+'/outputs/'+save_prefix+'_grid.nii'
-    file_hotspot = os.getcwd()+'/outputs/'+save_prefix+'_stimulations.nii'
-    file_heatmap = os.getcwd()+'/outputs/'+save_prefix+'_heatmap.nii'
+    file_grid = save_dir+'/'+save_prefix+'_grid.nii'
+    file_hotspot = save_dir+'/'+save_prefix+'_responses.nii'
+    file_heatmap = save_dir+'/'+save_prefix+'_heatmap.nii'
     
     # Grid save
     nii_grid = nib.Nifti1Image(map_grid, data_T1.affine)
     if not os.path.exists(file_grid):
         logging.info('...saving stimulation grid!')
         nib.save(nii_grid, file_grid)
-    
     
     # Stimulations save
     # Nibabel save nifti only needs the image data and an affine, which we'll re-use from the T1 image
@@ -170,12 +170,7 @@ def main(data_dict, config_dict):
         logging.info('...saving heatmap!')
         nib.save(nii_heatmap, file_heatmap)
 
-    # Make spreadsheet of values!
-
-    """
-    DEV NOTE:
-        To do -> Save measures in spreadsheet  
-    """
+    # Make and save spreadsheet of values! Courtesy of pandas DataFrame.to_excel method.
     measures_dict = {'Participant':data_dict['save_prefix'],
                     'Image File':data_dict['image'],
                     'Stim file':data_dict['stim'],
@@ -188,11 +183,12 @@ def main(data_dict, config_dict):
                     'COG Y':results_center_mass[1],
                     'COG Z':results_center_mass[2]}
     measures_dataframe = pd.DataFrame(measures_dict, index=[0])
-    measures_file = os.getcwd()+'/outputs/'+data_dict['save_prefix']+'_results.xlsx'
+    measures_file = save_dir+'/'+save_prefix+'_results.xlsx'
     measures_dataframe.to_excel(measures_file)
     
     
     # ~~~~~~NORMALIZE MAPS TO STANDARD SPACE~~~~~~
+    # Note this has to come after saving the initial files, as warps are applied to the heatmap
     if int(config_dict['normalize']) == 1:
         logging.info('Normalization to standard atlas beginning!')
         logging.info('Atlas chosen: '+file_atlas)
@@ -201,8 +197,8 @@ def main(data_dict, config_dict):
         t1_flirt_mni = fsl.FLIRT()
         t1_flirt_mni.inputs.in_file = file_t1
         t1_flirt_mni.inputs.reference = file_atlas
-        t1_flirt_mni.inputs.out_file = os.getcwd()+'/outputs/T1_mni_FLIRT_out.nii.gz'
-        t1_flirt_mni.inputs.out_matrix_file = os.getcwd()+'/outputs/T1_mni_FLIRT_omat.mat'
+        t1_flirt_mni.inputs.out_file = save_dir+'/T1_mni_FLIRT_out.nii.gz'
+        t1_flirt_mni.inputs.out_matrix_file = save_dir+'/T1_mni_FLIRT_omat.mat'
         t1_flirt_mni.inputs.output_type = 'NIFTI_GZ'
         flirt_result = t1_flirt_mni.run()
         
@@ -217,9 +213,9 @@ def main(data_dict, config_dict):
         # # 3. FLIRT measure maps to MNI with our warps of choice (just flirt for now):
         heatmap_applyxfm = fsl.preprocess.ApplyXFM()
         # heatmap or other measure map
-        heatmap_applyxfm.inputs.in_file = os.getcwd()+'/outputs/'+save_prefix+'_heatmap.nii'
-        heatmap_applyxfm.inputs.in_matrix_file = os.getcwd()+'/outputs/T1_mni_FLIRT_omat.mat'
-        heatmap_applyxfm.inputs.out_file = os.getcwd()+'/outputs/'+save_prefix+'_normalized_heatmap.nii.gz'
+        heatmap_applyxfm.inputs.in_file = save_dir+'/'+save_prefix+'_heatmap.nii'
+        heatmap_applyxfm.inputs.in_matrix_file = save_dir+'/T1_mni_FLIRT_omat.mat'
+        heatmap_applyxfm.inputs.out_file = save_dir+'/'+save_prefix+'_normalized_heatmap.nii.gz'
         heatmap_applyxfm.inputs.reference = file_atlas
         heatmap_applyxfm.inputs.apply_xfm = True
         result = heatmap_applyxfm.run()
