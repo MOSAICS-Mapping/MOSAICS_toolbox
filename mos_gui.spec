@@ -4,11 +4,9 @@ block_cipher = None
 
 
 a = Analysis(['mos_gui.py'],
-             pathex=['/Users/Bryce/Desktop/Postdoc_Scripts/GitHub/04_mosaics_2020_pyinstaller_miniconda'],
+             pathex=['/Users/Bryce/Desktop/Postdoc_Scripts/GitHub/04_mosaics_2020_dev'],
              binaries=[],
-             datas=[
-                 ('/Users/Bryce/Desktop/Postdoc_Scripts/GitHub/04_mosaics_2020_pyinstaller_miniconda/1_crop.png', 'data'),
-             ],
+             datas=[('/Users/Bryce/Desktop/Postdoc_Scripts/GitHub/04_mosaics_2020_dev/1_crop.png', '.')],
              hiddenimports=["cmath"],
              hookspath=[],
              runtime_hooks=[],

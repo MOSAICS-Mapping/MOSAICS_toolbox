@@ -6,17 +6,31 @@ Created on Thu Jan 28 13:36:20 2021
 @author: Bryce
 """
 
+import os, sys
+import logging
 import tkinter as tk
 import tkinter.filedialog as filedialog
 import tkinter.messagebox as messagebox
 from PIL import ImageTk
 from pathlib import PurePath
-import logging
-import os
 
 import mos_main
+import mos_find_datasets
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.disable(logging.DEBUG)
+
+# Find where a file is depending on whether we are running code from the package app (frozen)
+# or in development mode (not-frozen), in which case this is based on the terminal work dir
+def resource_path(path):
+    if getattr(sys, "frozen", False):
+        # If the frozen flag is set, we are in bundled-app mode!
+        resolved_path = os.path.abspath(os.path.join(sys._MEIPASS, path))
+    else:
+        # Normal development mode. Use os.getcwd() or __file__ as appropriate
+        resolved_path = os.path.abspath(os.path.join(os.getcwd(), path))
+    
+    return resolved_path
 
 class MOSAICSapp(tk.Tk):
     
@@ -35,7 +49,8 @@ class MOSAICSapp(tk.Tk):
         self.logo.pack(side=tk.RIGHT, expand=True, fill=tk.BOTH, padx=10, pady=10)
         
         global img #important so that path to our file doesn't get wiped byPython cleanup
-        background_image = "/Users/Bryce/Desktop/Postdoc_Scripts/GitHub/04_mosaics_2020/1_crop.png"
+        #background_image = "/Users/Bryce/Desktop/Postdoc_Scripts/GitHub/04_mosaics_2020/1_crop.png"
+        background_image = resource_path("1_crop.png")
         img = ImageTk.PhotoImage(file=background_image)
         width, height = 512, 475
         self.background = tk.Canvas(self.logo)
@@ -50,16 +65,16 @@ class MOSAICSapp(tk.Tk):
         
         # configure analysis button
         self.button_configure_analysis = tk.Button(self.buttons,text="Configure analysis",padx=15,pady=5,
-                                              command=self.call_gui_configure) # command=self.print_selected_vars
+                                              command=self.call_gui_configure)
         self.button_configure_analysis.grid(row=2,pady=10)
         
         # MOSIACS analysis button
         self.button_analysis = tk.Button(self.buttons,text = "MOSAICS analysis",padx=15,pady=5,
-                                        command=self.call_mosaics) # command=self.print_selected_vars
+                                        command=self.call_mosaics)
         self.button_analysis.grid(row=3,pady=10)
         
         self.button_close = tk.Button(self.buttons, text="Close GUI",padx=15,pady=5,
-                                 command=self.close_gui) # close_gui)
+                                 command=self.close_gui)
         self.button_close.grid(row=4,pady=10)
         
         # center buttons with empty top and bottom rows that are greedy for space.
@@ -71,12 +86,13 @@ class MOSAICSapp(tk.Tk):
         self.gui_select_open = False
                 
         self.data_dict = dict()
-        self.data_dict['image_select_text'] = "No image specified"
+        self.data_dict['data_select_text'] = "No data specified"
         self.data_dict['stim_select_text'] = "No stimulation data specified"
         self.data_dict['stim_flip'] = 0 # tk.Checkbutton in gui_select
         self.data_dict['save_dir'] = os.getcwd()
         self.data_dict['save_prefix'] = 'outputs'
         self.data_dict['select gui open'] = False
+        self.data_dict['data list'] = list()
         self.configure_dict = dict()
         # Set default variables for analysis, updated by guiConfigure class as desired
         self.configure_dict['dilate'] = 5
@@ -85,10 +101,6 @@ class MOSAICSapp(tk.Tk):
         self.configure_dict['normalize'] = 0 # tk.Checkbutton (guiConfigure) returns 0 or 1, not True or False
         self.configure_dict['atlas'] = 'MNI152_T1_1mm.nii.gz'
         self.configure_dict['config gui open'] = False
-        
-        # self.path_nii_file = ''
-        # self.path_stim_file = tk.StringVar()
-        # self.save_name = tk.StringVar()
         
     # ~~~~~~Create methods for MOSAICS function~~~~~~
     def call_gui_select(self):
@@ -110,9 +122,6 @@ class MOSAICSapp(tk.Tk):
         logging.info('dilate: '+str(self.configure_dict['dilate']))
         logging.info('smooth: '+str(self.configure_dict['smooth']))
         logging.info('MEP threshold: '+str(self.configure_dict['MEP_threshold']))
-        # print('nii file picked: '+str(self.data_dict['image']))
-        # print('stim file picked: '+str(self.data_dict['stim']))
-        # print('save name picked: '+str(self.data_dict['save_prefix']))
         
     def call_mosaics(self):
         mos_main.main(self.data_dict, self.configure_dict)
@@ -131,32 +140,24 @@ class guiSelect(tk.Toplevel):
                 
         self.window = tk.Toplevel(master)
         self.window.title("Select data")
-        self.window.geometry("300x280")
+        self.window.geometry("300x240")
         self.window.resizable(False,False)
         self.frame = tk.Frame(self.window)
         self.frame.pack(padx=10, pady=5)
         
         # ~~~~~~CONFIGURE GUI OBJECTS (BUTTONS ETC)~~~~~~
         self.path_t1 = tk.Label(self.frame,
-                            text=self.local_data['image_select_text'],
+                            text=self.local_data['data_select_text'],
                             bg="white",
                             width=30,
                             relief="groove",
                             borderwidth=2)
         self.select_t1 = tk.Button(self.frame,
-                              text="Select structural image (*.nii(.gz))",
-                              command = self.pick_t1)
-        self.path_stim = tk.Label(self.frame,
-                            text=self.local_data['stim_select_text'],
-                            bg="white",
-                            width=30,
-                            relief="groove",
-                            borderwidth=2)
-        self.select_stim = tk.Button(self.frame,
-                                text="Select stimulation data file (*.xls(x))",
-                                command = self.pick_stim_data)
-        self.flip_stim = tk.Checkbutton(self.frame,text="Flip stim coordinates?",
-                                             variable=self.local_data['stim_flip'],command=self.toggle_flip)  
+                              text="Select data folder",
+                              command = self.find_data)
+        self.flip_stim = tk.Checkbutton(self.frame,text="Flip stimulation coordinates?",
+                                             variable=self.local_data['stim_flip'],
+                                             command=self.toggle_flip)  
         # set flip_stim check button depending upon its current value
         if self.local_data['stim_flip'] == 1:
             self.flip_stim.select()
@@ -186,38 +187,32 @@ class guiSelect(tk.Toplevel):
         # arrange assets
         self.path_t1.grid(row=0, pady = 2, columnspan=3, sticky="w")
         self.select_t1.grid(row=1, column=0, sticky="w")
-        self.path_stim.grid(row=2, pady = 4, columnspan=3, sticky="w")
-        self.select_stim.grid(row=3, column=0, sticky="w")
-        self.flip_stim.grid(row=4, column=0, sticky="w")
-        self.path_save.grid(row=5, column=0, columnspan=3, sticky="w")
-        self.select_save.grid(row=6,column=0, sticky="w")
-        self.list_save_name.grid(row=7, column=0, sticky="w")
-        self.enter_save_name.grid(row=8, column=0, columnspan=2, sticky="w")
-        self.close_button.grid(row=9, column=0, sticky="e")
+        self.flip_stim.grid(row=2, column=0, sticky="w")
+        self.path_save.grid(row=3, column=0, columnspan=3, sticky="w")
+        self.select_save.grid(row=4,column=0, sticky="w")
+        self.list_save_name.grid(row=5, column=0, sticky="w")
+        self.enter_save_name.grid(row=6, column=0, columnspan=2, sticky="w")
+        self.close_button.grid(row=7, column=0, sticky="e")
 
-    def pick_t1(self):
-        file_nii = filedialog.askopenfilename(initialdir="~/",
-                                          title="Select a t1 file (.nii, .nii.gz)",
-                                          filetypes=(("Nifti", ".nii"), ("Compressed Nifti", ".nii.gz"), ("All files", "*.*")))
-        p = PurePath(file_nii)
-        # update the text field to reflect user chosen file
-        self.path_t1.config(text=p.anchor+'...'+p.name)
-        self.local_data['image_select_text'] = p.anchor+'...'+p.name
+    def find_data(self):
+        """
+        Change this function name once I've brought in the new find_datasets script
+        """
+        data_folder = filedialog.askdirectory(initialdir="~/",
+                                          title="Select a folder of files to process")
+        
+        # update the text field to reflect user chosen folder
+        p = PurePath(data_folder)
+        self.path_t1.config(text='...'+p.anchor+p.name)
+        self.local_data['image_select_text'] = '...'+p.anchor+p.name
         
         # bring this value back to the main GUI right away, so it's not lost due to scope
-        self.local_data['image'] = file_nii
-    
-    def pick_stim_data(self):
-        file_stim = filedialog.askopenfilename(initialdir="~/",
-                                          title="Select stimulation data",
-                                          filetypes=(("Coordinates", ".xlsx"), ("All files", "*.*")))
-        p = PurePath(file_stim)
-        # update the text field to reflect user chosen file
-        self.path_stim.config(text=p.anchor+'...'+p.name)
+        self.local_data['data folder'] = data_folder
         
-        # bring this value back to the main GUI right away, so it's not lost due to scope
-        self.local_data['stim_select_text'] = p.anchor+'...'+p.name
-        self.local_data['stim'] = file_stim
+        # make a list of all datasets in this folder, stored as data_dict['data list'] within this function
+        self.local_data['data list'] = mos_find_datasets.main(self.local_data)
+        
+        logging.info('...'+str(len(self.local_data['data list']))+' subjects found for processing in your chosen folder.')
     
     def toggle_flip(self):
         if self.local_data['stim_flip'] == 0:
@@ -239,20 +234,13 @@ class guiSelect(tk.Toplevel):
         # checks that both nii and stim data have been selected, and that files exist    
         self.local_data['save_prefix'] = self.enter_save_name.get()
 
-        if 'image' in self.local_data:
-            if not os.path.isfile(self.local_data['image']):
+        if 'data folder' in self.local_data:
+            if not os.path.isdir(self.local_data['data folder']):
                 settings_error = True
-                messagebox.showerror('Input Error','Cannot find structural image, please re-select.')
+                messagebox.showerror('Input Error','Data selection must be a folder, please re-select.')
         else:
             settings_error = True
-            messagebox.showerror('Input Error','No structural image selected.')
-        if 'stim' in self.local_data:
-            if not os.path.isfile(self.local_data['image']):
-                settings_error = True
-                messagebox.showerror('Input Error','Cannot find stimulation data, please re-select.')
-        else:
-            settings_error = True
-            messagebox.showerror('Input Error','No stimulation data chosen.')
+            messagebox.showerror('Input Error','Data not found, please select a folder.')
         
         if settings_error == False:
             self.local_data['select gui open'] = False

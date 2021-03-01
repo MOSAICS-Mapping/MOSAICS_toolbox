@@ -11,15 +11,19 @@ import logging
 from nipype.interfaces import fsl
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')    
 
-def main(data_dict, config_dict):
+def main(subject, data_dict, config_dict):
     
     # ~~~~~~SET UP VARIABLES~~~~~~
     # structural file
-    file_t1 = str(data_dict['image'])
+    file_t1 = subject[1]
+    # file_t1 = str(data_dict['data'])
+    
     # save directory
     save_dir = str(data_dict['save_dir'])
     # save prefix
-    save_prefix = str(data_dict['save_prefix'])
+    tag = subject[0]
+    # save_prefix = str(data_dict['save_prefix'])
+    
     # standard space reference
     file_atlas = str(config_dict['atlas'])
 
@@ -31,8 +35,8 @@ def main(data_dict, config_dict):
     t1_flirt_mni = fsl.FLIRT()
     t1_flirt_mni.inputs.in_file = file_t1
     t1_flirt_mni.inputs.reference = file_atlas
-    t1_flirt_mni.inputs.out_file = save_dir+'/'+save_prefix+'_FLIRT_out.nii.gz'
-    t1_flirt_mni.inputs.out_matrix_file = save_dir+'/'+save_prefix+'_FLIRT_omat.mat'
+    t1_flirt_mni.inputs.out_file = save_dir+'/'+tag+'_FLIRT_out.nii.gz'
+    t1_flirt_mni.inputs.out_matrix_file = save_dir+'/'+tag+'_FLIRT_omat.mat'
     t1_flirt_mni.inputs.output_type = 'NIFTI_GZ'
     flirt_result = t1_flirt_mni.run()
     
@@ -47,9 +51,10 @@ def main(data_dict, config_dict):
     # # 3. FLIRT measure maps to MNI with our warps of choice (just flirt for now):
     heatmap_applyxfm = fsl.preprocess.ApplyXFM()
     # heatmap or other measure map
-    heatmap_applyxfm.inputs.in_file = save_dir+'/'+save_prefix+'_heatmap.nii'
-    heatmap_applyxfm.inputs.in_matrix_file = save_dir+'/'+save_prefix+'_FLIRT_omat.mat'
-    heatmap_applyxfm.inputs.out_file = save_dir+'/'+save_prefix+'_normalized_heatmap.nii.gz'
+    heatmap_applyxfm.inputs.in_file = save_dir+'/'+tag+'_heatmap.nii'
+    heatmap_applyxfm.inputs.in_matrix_file = save_dir+'/'+tag+'_FLIRT_omat.mat'
+    heatmap_applyxfm.inputs.out_file = save_dir+'/'+tag+'_normalized_heatmap.nii.gz'
+    heatmap_applyxfm.inputs.out_matrix_file = save_dir+'/'+tag+'_heatmap_flirtman.mat'
     heatmap_applyxfm.inputs.reference = file_atlas
     heatmap_applyxfm.inputs.apply_xfm = True
     result = heatmap_applyxfm.run()
