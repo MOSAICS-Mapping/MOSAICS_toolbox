@@ -52,9 +52,6 @@ def main(data_dict, config_dict):
     # save directory
     save_dir = str(data_dict['save_dir'])
     
-    # # save prefix
-    # save_prefix = str(data_dict['save_prefix'])
-    
     # dilate variable
     dilate = int(config_dict['dilate'])
     # smooth variable
@@ -63,7 +60,7 @@ def main(data_dict, config_dict):
     MEP_thresh = int(config_dict['MEP_threshold'])
 
     # # Create output directory
-    # os.makedirs(os.getcwd()+'/outputs/',exist_ok=True)
+    os.makedirs(save_dir,exist_ok=True)
     
     # Initialize a couple lists before our for loop so we can create a dataframe to
     # output for our results spreadsheet!
@@ -82,26 +79,23 @@ def main(data_dict, config_dict):
     
     for subject in data_list:
         
-        logging.critical(subject)
-        
         # data_list constructed, and these variables determined, by mos_find_datasets.py
         tag = subject[0]
         file_t1 = subject[1]
         file_nibs_map = subject[2]
         
-        logging.critical(file_t1)
+        logging.info('...processing '+file_t1)
         
         # ~~~~~~LOAD DATA~~~~~~
         # Read in a 1mm isotropic T1-weighted MRI .nii
         data_T1 = nib.load(file_t1)
+        
         # Dead the Brainsight coordindates file
         # should be four columns. X, Y, Z, and the corresponding MEP amplitude for that location
         data_nibs_map = pd.read_excel(file_nibs_map,header=None)
         data_nibs_map[0] = round(data_nibs_map[0])
         data_nibs_map[1] = round(data_nibs_map[1])
         data_nibs_map[2] = round(data_nibs_map[2])
-        #num_locs = number of stimulation sites
-        #num_locs = data_nibs_map[0].shape[0] <--- [] Think I don't need this
         
         
         # ~~~~~~PROCESSING BEGINS~~~~~~
@@ -147,13 +141,11 @@ def main(data_dict, config_dict):
         # Rotate matrices in the y dimension (AP) to convert from RPS (Brainsight) to RAS (Nifti)
         # RPS = +x is right, +y is posterior, +z is superior
         # RAS = +x is right, +y is anterior, +z is superior
-        if data_dict['stim_flip'] == 1:
-            logging.info('stim_flip == 1 check succeeded, flipping.')
+        if data_dict['stim_flip'].get() == 1:
+            logging.info('...Flipping coordinates of stimulations along anterior-posterior axis')
             map_stims = np.flip(map_stims,1)
             map_samples = np.flip(map_samples,1)
             map_grid = np.flip(map_grid,1)
-        else:
-            logging.info('stim_flip type is '+str(type(data_dict['stim_flip'])))
         
         
         # ~~~~~~CALCULATE METRICS~~~~~~
@@ -167,7 +159,13 @@ def main(data_dict, config_dict):
         results_center_mass = ndi.measurements.center_of_mass(map_samples)
     
         # ~~~~~~STRIP T1 image~~~~~~
-        mos_skullstrip.main(tag, file_t1, save_dir)
+        # reminder, brainmask check = 0 if user does not provide their own brainmask and
+        # MOSAICS is to devise its own (we use default BET settings)
+        if config_dict['brainmask check'].get() == 0:
+            mos_skullstrip.main(tag, file_t1, data_folder, save_dir)
+            file_brainmask = os.path.abspath(os.path.join(data_folder, tag+'_brain_mask.nii.gz'))
+        elif config_dict['brainmask check'].get() == 1:
+            file_brainmask = os.path.abspath(os.path.join(data_folder, tag+config_dict['brainmask suffix']))
     
         # ~~~~~~SAVE FILES~~~~~~
         # Stimulations: Main output, MEP amplitudes within a matrix sized to match structural image.
@@ -201,7 +199,7 @@ def main(data_dict, config_dict):
             nib.save(nii_heatmap, file_heatmap)
     
         # Heatmap: apply brain mask to limit smoothing
-        file_brainmask = save_dir+'/'+tag+'_brain_mask.nii.gz'
+        file_brainmask = data_folder+'/'+tag+'_brain_mask.nii.gz'
         mask_heatmap = fsl.ApplyMask()
         mask_heatmap.inputs.in_file = file_heatmap
         mask_heatmap.inputs.mask_file = file_brainmask
@@ -225,7 +223,7 @@ def main(data_dict, config_dict):
     
         # ~~~~~~NORMALIZE MAPS TO STANDARD SPACE~~~~~~
         # Note this has to come after saving the initial files, as warps are applied to the heatmap
-        if int(config_dict['normalize']) == 1:
+        if config_dict['normalize'].get() == 1:
             mos_normalize_to_mni.main(subject, data_dict, config_dict)
 
     # print values to spreadsheet after the loop has completed
@@ -233,7 +231,9 @@ def main(data_dict, config_dict):
     measures_file = save_dir+'/mapping_results.xlsx'
     metrics_dataframe.to_excel(measures_file)
 
+    logging.info('...MOSAICS analysis completed successfully!')
+
 if __name__ == '__main__':
     main()
-    logging.info('...MOSAICS analysis completed successfully!')
+    
 

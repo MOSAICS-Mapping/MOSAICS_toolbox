@@ -26,13 +26,13 @@ import logging
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-def main(data_dict):
+def main(data_dict, config_dict):
     
     # initialize empty list that will be filled here
     data_dict['data list'] = list()
         
     # find all nii or nii.gz datasets
-    datasets = glob.glob(data_dict['data folder']+'/*.nii*') #returns a list, possible too inclusive but hopefully not
+    datasets = glob.glob(data_dict['data folder']+'/*.nii*') #returns a list, possibly too inclusive but hopefully not
     
     # pull everything before the first dot to find the tag for each subject
     tags = [os.path.basename(x) for x in datasets]
@@ -42,12 +42,10 @@ def main(data_dict):
     # processing
     data_dict['data list'] = list()
     for tag in tags:
-        structural = glob.glob(data_dict['data folder']+'/'+tag+'*.nii*')[0]
-        stimulation = glob.glob(data_dict['data folder']+'/'+tag+'.xls*')[0]
-        data_dict['data list'].append([tag,structural, stimulation])
-        
-        # if os.path.isfile(tag+'.xls') or os.path.isfile(tag+'.xlsx'):
-        #     data_dict['data list'].append(tag)
+        if glob.glob(data_dict['data folder']+'/'+tag+'.xls*') != []:
+            stimulation = glob.glob(data_dict['data folder']+'/'+tag+'.xls*')[0]
+            structural = glob.glob(data_dict['data folder']+'/'+tag+'.nii*')[0]
+            data_dict['data list'].append([tag,structural, stimulation])
     
     return data_dict['data list']
     
