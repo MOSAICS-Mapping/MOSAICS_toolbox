@@ -28,11 +28,8 @@ extra functions list, outsource to their own scripts hey?
 # export FSLDIR PATH
     
 import os
-import glob
-import subprocess
 import nibabel as nib
 import pandas as pd
-import openpyxl
 import numpy as np
 from scipy import ndimage as ndi
 from nipype.interfaces import fsl
@@ -84,7 +81,7 @@ def main(data_dict, config_dict):
         file_t1 = subject[1]
         file_nibs_map = subject[2]
         
-        logging.info('...processing '+file_t1)
+        logging.info('...processing: '+file_t1)
         
         # ~~~~~~LOAD DATA~~~~~~
         # Read in a 1mm isotropic T1-weighted MRI .nii
@@ -171,9 +168,9 @@ def main(data_dict, config_dict):
         # Stimulations: Main output, MEP amplitudes within a matrix sized to match structural image.
         #               Stimulations from experiment have been uniformaly dilated by the 'dilate' integer.
         # Heatmap:      Stimulations map with a gaussian filter applied to smooth the data
-        file_grid = save_dir+'/'+tag+'_grid.nii'
-        file_hotspot = save_dir+'/'+tag+'_responses.nii'
-        file_heatmap = save_dir+'/'+tag+'_heatmap.nii'
+        file_grid = os.path.join(save_dir,tag,'_grid.nii')
+        file_hotspot = os.path.join(save_dir,tag,'_responses.nii')
+        file_heatmap = os.path.join(save_dir,tag,'_heatmap.nii')
         
         # Grid save
         nii_grid = nib.Nifti1Image(map_grid, data_T1.affine)
@@ -199,11 +196,11 @@ def main(data_dict, config_dict):
             nib.save(nii_heatmap, file_heatmap)
     
         # Heatmap: apply brain mask to limit smoothing
-        file_brainmask = data_folder+'/'+tag+'_brain_mask.nii.gz'
+        file_brainmask = os.path.join(data_folder,tag,'_brain_mask.nii.gz')
         mask_heatmap = fsl.ApplyMask()
         mask_heatmap.inputs.in_file = file_heatmap
         mask_heatmap.inputs.mask_file = file_brainmask
-        mask_heatmap.inputs.out_file = save_dir+'/'+tag+'_heatmap_masked.nii.gz'
+        mask_heatmap.inputs.out_file = os.path.join(save_dir,tag,'_heatmap_masked.nii.gz')
         mask_result = mask_heatmap.run()
     
         # Make a list of this subject's values, then append it to the overall results list
@@ -228,7 +225,7 @@ def main(data_dict, config_dict):
 
     # print values to spreadsheet after the loop has completed
     metrics_dataframe = pd.DataFrame(results_metrics_list, columns=results_column_names)    
-    measures_file = save_dir+'/mapping_results.xlsx'
+    measures_file = os.path.join(save_dir,'/mapping_results.xlsx')
     metrics_dataframe.to_excel(measures_file)
 
     logging.info('...MOSAICS analysis completed successfully!')

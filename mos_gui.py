@@ -12,7 +12,7 @@ import tkinter as tk
 import tkinter.filedialog as filedialog
 import tkinter.messagebox as messagebox
 from PIL import ImageTk
-from pathlib import PurePath
+from pathlib import PurePath, Path
 
 import mos_main
 import mos_find_datasets
@@ -92,9 +92,8 @@ class MOSAICSapp(tk.Tk):
         self.data_dict['stim_flip'] = tk.IntVar(self) # tk.Checkbutton in gui_select
         self.data_dict['save_dir'] = os.getcwd()
         self.data_dict['save_prefix'] = 'outputs'
-        #self.data_dict['select gui open'] = False
-        self.data_dict['select gui open'] = None
         self.data_dict['data list'] = list()
+        self.data_dict['select gui open'] = None
         
         self.configure_dict = dict()
         # Set default variables for analysis, updated by guiConfigure class as desired
@@ -219,16 +218,17 @@ class guiSelect(tk.Toplevel):
         
     def find_data(self):
 
-        data_folder = filedialog.askdirectory(initialdir="~/",
+        # Path.home() used here to get home directory for osx and windows, both
+        data_folder = filedialog.askdirectory(initialdir=str(Path.home()),
                                           title="Select a folder of files to process")
         
         # update the text field to reflect user chosen folder
         p = PurePath(data_folder)
-        self.path_t1.config(text='...'+p.anchor+p.name)
-        self.local_data['data select text'] = '...'+p.anchor+p.name
+        self.path_t1.config(text=os.path.join('...'+p.anchor,p.name))
+        self.local_data['data select text'] = os.path.join('...'+p.anchor+p.name)
         
         # update save field to reflect a default 'outputs' folder unless user changes below
-        self.path_save.config(text='...'+p.anchor+p.name+'/outputs/')
+        self.path_save.config(text=os.path.join('...'+p.anchor,p.name,'outputs'))
         self.local_data['save_dir'] = os.path.join(data_folder, 'outputs')
         # logging.info(self.local_data['save dir'])
         
@@ -243,7 +243,12 @@ class guiSelect(tk.Toplevel):
     def set_save_dir(self):
         save_dir = filedialog.askdirectory(initialdir=self.local_data['save_dir'],
                                            title="Select directory to save output files")
-        self.path_save.config(text='...'+save_dir.split('/')[-2]+'/'+save_dir.split('/')[-1])
+        p = PurePath(save_dir)
+        self.path_save.config(text=os.path.join('...'+p.anchor,p.name))
+        
+        # self.path_save.config(text='...'+save_dir.split('/')[-2]+'/'+save_dir.split('/')[-1])
+        # self.path_save.config(text=os.path.join('...',save_dir.split('/')[-2],save_dir.split('/')[-1]))
+        
         self.local_data['save_dir'] = save_dir
 
     def save_and_close(self):
@@ -390,11 +395,11 @@ class guiConfigure(tk.Toplevel):
             self.normalise_atlas.configure(bg='white')
     
     def select_atlas(self):
-        file_atlas = filedialog.askopenfilename(initialdir="~/",
+        file_atlas = filedialog.askopenfilename(initialdir=str(Path.home()),
                                                 title="Select standard atlas to normalise measure maps to (*.nii, *.nii.gz)",
                                                 filetypes=(("Nifti", ".nii"), ("Compressed Nifti", ".nii.gz"), ("All files", "*.*")))
         p = PurePath(file_atlas)
-        self.normalise_atlas.config(text=p.anchor+'...'+p.name[-19:])
+        self.normalise_atlas.config(text=os.path.join('...'+p.anchor,p.name)) # -19...? This is hard coded to MNI?
         # bring this value back to the main GUI right away, so it's not lost due to scope
         self.local_data['atlas'] = file_atlas
         

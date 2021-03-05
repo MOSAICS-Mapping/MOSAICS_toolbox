@@ -11,6 +11,7 @@ deSCRIPTion:
 """
 
 # Imports:
+import os
 import logging
 from nipype.interfaces import fsl
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -23,7 +24,7 @@ def main(tag, file_t1, data_folder, save_dir):
     bet.inputs.in_file = file_t1
     bet.inputs.frac = 0.5 #default for bet, set here for consistency
     bet.inputs.mask = True
-    bet.inputs.out_file = data_folder+'/'+tag+'_brain.nii.gz'
+    bet.inputs.out_file = os.path.join(data_folder,tag,'_brain.nii.gz')
     t1_stripped = bet.run()
 
 if __name__ == '__main__':

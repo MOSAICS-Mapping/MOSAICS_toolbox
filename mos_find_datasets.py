@@ -42,9 +42,9 @@ def main(data_dict, config_dict):
     # processing
     data_dict['data list'] = list()
     for tag in tags:
-        if glob.glob(data_dict['data folder']+'/'+tag+'.xls*') != []:
-            stimulation = glob.glob(data_dict['data folder']+'/'+tag+'.xls*')[0]
-            structural = glob.glob(data_dict['data folder']+'/'+tag+'.nii*')[0]
+        if glob.glob(os.path.join(data_dict['data folder'],tag,'.xls*')) != []:
+            stimulation = glob.glob(os.path.join(data_dict['data folder'],tag,'.xls*'))[0]
+            structural = glob.glob(os.path.join(data_dict['data folder'],tag,'.nii*'))[0]
             data_dict['data list'].append([tag,structural, stimulation])
     
     return data_dict['data list']
