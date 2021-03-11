@@ -4,9 +4,12 @@ block_cipher = None
 
 
 a = Analysis(['mos_gui.py'],
-             pathex=['/Users/Bryce/Desktop/Postdoc_Scripts/GitHub/04_mosaics_2020_dev'],
+             pathex=['/Users/Bryce/Desktop/Postdoc_Scripts/GitHub/04_mosaics_2020'],
              binaries=[],
-             datas=[('/Users/Bryce/Desktop/Postdoc_Scripts/GitHub/04_mosaics_2020_dev/1_crop.png', '.')],
+             datas=[('/Users/Bryce/Desktop/Postdoc_Scripts/GitHub/04_mosaics_2020/include/1_crop.png', './include'),
+             ('/Users/Bryce/Desktop/Postdoc_Scripts/GitHub/04_mosaics_2020/include/ci_info/vendors.json', './ci_info'),
+             ('/Users/Bryce/Desktop/Postdoc_Scripts/GitHub/04_mosaics_2020/include/MNI152_T1_1mm.nii.gz', './include'),
+             ('/Users/Bryce/Desktop/Postdoc_Scripts/GitHub/04_mosaics_2020/include/MNI152_T1_1mm_brain_mask.nii.gz', './include')],
              hiddenimports=["cmath"],
              hookspath=[],
              runtime_hooks=[],

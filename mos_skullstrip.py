@@ -20,12 +20,14 @@ def main(tag, file_t1, data_folder, save_dir):
     
     logging.info('...performing BET skull stripping')
     
-    bet = fsl.BET()
-    bet.inputs.in_file = file_t1
-    bet.inputs.frac = 0.5 #default for bet, set here for consistency
-    bet.inputs.mask = True
-    bet.inputs.out_file = os.path.join(data_folder,tag,'_brain.nii.gz')
-    t1_stripped = bet.run()
+    bet_output =  os.path.join(data_folder,tag+'_brain.nii.gz')
+    if not os.path.isfile(bet_output):
+        bet = fsl.BET()
+        bet.inputs.in_file = file_t1
+        bet.inputs.frac = 0.5 #default for bet, set here for consistency
+        bet.inputs.mask = True
+        bet.inputs.out_file = bet_output
+        t1_stripped = bet.run()
 
 if __name__ == '__main__':
     main()

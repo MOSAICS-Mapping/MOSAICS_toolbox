@@ -4,6 +4,8 @@
 Created on Thu Jan 28 13:36:20 2021
 
 @author: Bryce
+
+Toolbox version: α - v1.1.2
 """
 
 import os, sys
@@ -54,7 +56,7 @@ class MOSAICSapp(tk.Tk):
         self.logo.pack(side=tk.RIGHT, expand=True, fill=tk.BOTH, padx=10, pady=10)
                 
         global img #important so that path to our file doesn't get wiped byPython cleanup
-        background_image = resource_path("1_crop.png")
+        background_image = resource_path("include/1_crop.png")
         img = ImageTk.PhotoImage(file=background_image)
         width, height = 512, 475
         self.background = tk.Canvas(self.logo)
@@ -88,7 +90,7 @@ class MOSAICSapp(tk.Tk):
     def declare_dicts(self):
         self.data_dict = dict()
         self.data_dict['data select text'] = "No data specified"
-        self.data_dict['stim_select_text'] = "No stimulation data specified"
+        # self.data_dict['stim_select_text'] = "No stimulation data specified"
         self.data_dict['stim_flip'] = tk.IntVar(self) # tk.Checkbutton in gui_select
         self.data_dict['save_dir'] = os.getcwd()
         self.data_dict['save_prefix'] = 'outputs'
@@ -103,7 +105,8 @@ class MOSAICSapp(tk.Tk):
         self.configure_dict['brainmask check'] = tk.IntVar(self) # default is 0
         self.configure_dict['brainmask suffix'] = '_brain_mask.nii.gz'
         self.configure_dict['normalize'] = tk.IntVar(self) # default is 0
-        self.configure_dict['atlas'] = 'MNI152_T1_1mm.nii.gz'
+        self.configure_dict['atlas'] = resource_path('include/MNI152_T1_1mm.nii.gz')
+        self.configure_dict['atlas mask'] = resource_path('include/MNI152_T1_1mm_brain_mask.nii.gz')
         self.configure_dict['config gui open'] = None
     
     # ~~~~~~ Methods for MOSAICS functions ~~~~~~
@@ -188,8 +191,9 @@ class guiSelect(tk.Toplevel):
             self.flip_stim.select()
         elif self.local_data['stim_flip'].get() == 0:
             self.flip_stim.deselect()
+        save_text = os.path.normpath(self.local_data['save_dir'])
         self.path_save = tk.Label(self.frame,
-                            text='...'+self.local_data['save_dir'].split('/')[-2]+'/'+self.local_data['save_dir'].split('/')[-1],
+                            text='...'+save_text.split(os.sep)[-2]+os.sep+save_text.split(os.sep)[-1],
                             bg="white",
                             width=30,
                             relief="groove",
@@ -286,7 +290,7 @@ class guiConfigure(tk.Toplevel):
     def gui_configure_layout(self):
 
         self.window.title("Configure analysis")
-        self.window.geometry("450x200")
+        self.window.geometry("520x240")
         self.window.resizable(False,False)
         self.frame = tk.Frame(self.window)
         self.frame.pack(padx=10, pady=5)
@@ -348,7 +352,7 @@ class guiConfigure(tk.Toplevel):
             self.normalise_bool.deselect()
         # if checkbox is checked, pick a standard atlas to use:
         self.normalise_atlas = tk.Label(self.frame,
-                                        text="./"+str(self.local_data['atlas']),
+                                        text="./"+str(os.path.basename(self.local_data['atlas'])),
                                         relief="groove",
                                         borderwidth=2,
                                         width=22)#width=30
@@ -356,6 +360,18 @@ class guiConfigure(tk.Toplevel):
                                                 text="Choose standard atlas:",
                                                 state='disabled',
                                                 command = self.select_atlas)
+        
+        # if checkbox is checked, pick a matching brain mask to use:
+        self.atlas_mask = tk.Label(self.frame,
+                                        text="./"+str(os.path.basename(self.local_data['atlas mask'])),
+                                        relief="groove",
+                                        borderwidth=2,
+                                        width=30)#width=30
+        self.atlas_mask_select = tk.Button(self.frame,
+                                                text="Choose standard atlas mask:",
+                                                state='disabled',
+                                                command = self.select_atlas_mask)
+        
         self.bg_init = self.normalise_atlas_select.cget("background")
         self.close_button = tk.Button(self.frame,
                                       text="Submit",
@@ -374,11 +390,13 @@ class guiConfigure(tk.Toplevel):
         self.MEP_label.grid(row=3,column=0)
         self.MEP_form.grid(row=3,column=1,sticky="w")
         self.brainmask_check.grid(row=4, column=0, sticky="w")
-        self.brainmask_suffix.grid(row=4, column=1)
+        self.brainmask_suffix.grid(row=4, column=1, sticky="w")
         self.normalise_bool.grid(row=5, column=0)
         self.normalise_atlas_select.grid(row=6,column=0)
-        self.normalise_atlas.grid(row=6,column=1)
-        self.close_button.grid(row=7,column=1)
+        self.normalise_atlas.grid(row=6,column=1, sticky="w")
+        self.atlas_mask_select.grid(row=7,column=0,pady=5)
+        self.atlas_mask.grid(row=7,column=1,pady=5, sticky="w")
+        self.close_button.grid(row=8,column=1)
     
     def mask_check(self):
         if self.local_data['brainmask check'].get() == 1:
@@ -389,19 +407,32 @@ class guiConfigure(tk.Toplevel):
     def warp_check(self):
         if self.local_data['normalize'].get() == 0:
             self.normalise_atlas_select.configure(state='disabled')
+            self.atlas_mask_select.configure(state='disabled')
             self.normalise_atlas.configure(bg=self.bg_init)
+            self.atlas_mask.configure(bg=self.bg_init)
         elif self.local_data['normalize'].get() == 1:
             self.normalise_atlas_select.configure(state='normal')
+            self.atlas_mask_select.configure(state='normal')
             self.normalise_atlas.configure(bg='white')
+            self.atlas_mask.configure(bg='white')
     
     def select_atlas(self):
         file_atlas = filedialog.askopenfilename(initialdir=str(Path.home()),
                                                 title="Select standard atlas to normalise measure maps to (*.nii, *.nii.gz)",
                                                 filetypes=(("Nifti", ".nii"), ("Compressed Nifti", ".nii.gz"), ("All files", "*.*")))
         p = PurePath(file_atlas)
-        self.normalise_atlas.config(text=os.path.join('...'+p.anchor,p.name)) # -19...? This is hard coded to MNI?
+        self.normalise_atlas.config(text=os.path.join('...'+p.anchor,p.name))
         # bring this value back to the main GUI right away, so it's not lost due to scope
         self.local_data['atlas'] = file_atlas
+        
+    def select_atlas_mask(self):
+        file_atlas_mask = filedialog.askopenfilename(initialdir=str(Path.home()),
+                                                title="Select standard atlas mask (*.nii, *.nii.gz)",
+                                                filetypes=(("Nifti", ".nii"), ("Compressed Nifti", ".nii.gz"), ("All files", "*.*")))
+        p = PurePath(file_atlas)
+        self.atlas_mask.config(text=os.path.join('...'+p.anchor,p.name))
+        # bring this value back to the main GUI right away, so it's not lost due to scope
+        self.local_data['atlas mask'] = file_atlas_mask
         
     # Submit and close button MUST include checks that each value provided is valid!          
     def save_and_close(self):

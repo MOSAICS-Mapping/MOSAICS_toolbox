@@ -7,38 +7,42 @@ Created on Wed Feb 24 11:12:45 2021
 """
 
 # Imports:
+import os
 import logging
 from nipype.interfaces import fsl
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')    
 
-def main(subject, data_dict, config_dict):
+def main(tag, stim_data, data_dir, save_dir, file_t1, file_heatmap_nomask, file_atlas):
+#subject, data_dict, config_dict):
     
     # ~~~~~~SET UP VARIABLES~~~~~~
-    # structural file
-    file_t1 = subject[1]
-    # file_t1 = str(data_dict['data'])
     
-    # save directory
-    save_dir = str(data_dict['save_dir'])
-    # save prefix
-    tag = subject[0]
-    # save_prefix = str(data_dict['save_prefix'])
-    
-    # standard space reference
-    file_atlas = str(config_dict['atlas'])
+    # # save directory
+    # data_dir = str(data_dict['data folder'])
+    # save_dir = str(data_dict['save_dir'])
+    # # save prefix
+    # tag = subject[0]
+    # stim_data = subject[1]
+    # # structural file
+    # file_t1 = os.path.join(data_dir, subject[2])
+
+    # # standard space reference
+    # file_atlas = str(config_dict['atlas'])
 
     logging.info('...normalization to standard atlas beginning!')
     logging.info('...atlas chosen: '+file_atlas)
 
     # FLIRT section:
     # Register T1 image to MNI_152 template using FLIRT and FNIRT
-    t1_flirt_mni = fsl.FLIRT()
-    t1_flirt_mni.inputs.in_file = file_t1
-    t1_flirt_mni.inputs.reference = file_atlas
-    t1_flirt_mni.inputs.out_file = save_dir+'/'+tag+'_FLIRT_out.nii.gz'
-    t1_flirt_mni.inputs.out_matrix_file = save_dir+'/'+tag+'_FLIRT_omat.mat'
-    t1_flirt_mni.inputs.output_type = 'NIFTI_GZ'
-    flirt_result = t1_flirt_mni.run()
+    warped_t1 = os.path.join(save_dir,tag+'_warped.nii.gz')
+    if not os.path.isfile(warped_t1):
+        t1_flirt_mni = fsl.FLIRT()
+        t1_flirt_mni.inputs.in_file = file_t1
+        t1_flirt_mni.inputs.reference = file_atlas
+        t1_flirt_mni.inputs.out_file = warped_t1
+        t1_flirt_mni.inputs.out_matrix_file = os.path.join(save_dir,tag+'_warped_omat.mat')
+        t1_flirt_mni.inputs.output_type = 'NIFTI_GZ'
+        flirt_result = t1_flirt_mni.run()
     
     # I'm going to leave FNIRT out for now because... non-linear 
     # # 2. FNIRT t1 to MNI:
@@ -50,11 +54,12 @@ def main(subject, data_dict, config_dict):
     
     # # 3. FLIRT measure maps to MNI with our warps of choice (just flirt for now):
     heatmap_applyxfm = fsl.preprocess.ApplyXFM()
-    # heatmap or other measure map
-    heatmap_applyxfm.inputs.in_file = save_dir+'/'+tag+'_heatmap.nii'
-    heatmap_applyxfm.inputs.in_matrix_file = save_dir+'/'+tag+'_FLIRT_omat.mat'
-    heatmap_applyxfm.inputs.out_file = save_dir+'/'+tag+'_normalized_heatmap.nii.gz'
-    heatmap_applyxfm.inputs.out_matrix_file = save_dir+'/'+tag+'_heatmap_flirtman.mat'
+    # heatmap, using unmasked because then we're only masking based on standard space atlas mask,
+    # rather than that and a BET mask
+    heatmap_applyxfm.inputs.in_file = file_heatmap_nomask
+    heatmap_applyxfm.inputs.in_matrix_file = os.path.join(save_dir,tag+'_warped_omat.mat')
+    heatmap_applyxfm.inputs.out_file = os.path.join(save_dir,stim_data+'_warped_heatmap.nii.gz')
+    heatmap_applyxfm.inputs.out_matrix_file = os.path.join(save_dir,stim_data+'_heatmap_flirt.mat')
     heatmap_applyxfm.inputs.reference = file_atlas
     heatmap_applyxfm.inputs.apply_xfm = True
     result = heatmap_applyxfm.run()
