@@ -64,37 +64,13 @@ def main(data_dict, config_dict):
                         stim_name = stim_match.group(1)
                         # if we have valid nii and xl files, append the info of this pair to a data processing list
                         data_dict['data list'].append([tag, stim_name, nii_match.string, stim_match.string])
-                        logging.debug('...'+nii_match.string+', '+stim_match.string+' are a matched pair. Added to processing list!')
+                        logging.debug('...'+nii_match.string+', '+stim_match.string+' are a matched pair. Added to processing list')
                     else:
-                        logging.debug('...'+str(stim_data)+' name invalid, must contain only A-Z, 0-9, _, and -.')
+                        logging.debug('...'+str(stim_data)+' name invalid, must contain only A-Z, 0-9, _, and -')
             else:
-                logging.debug('...no stimulation data found that matches '+nii_match.string+', moving on.')
+                logging.debug('...no stimulation data found that matches '+nii_match.string+', moving on')
         else:
-            logging.debug('...'+str(nii)+' name invalid, must contain only A-Z, 0-9, _, and -.')
-    
-    """
-    # # pull everything before the first dot to find the tag for each subject
-    # tags = [os.path.basename(x) for x in datasets]
-    # tags = [x.split('.')[0] for x in tags]    
-    
-    # # add each subject with a nifti and excel spreadsheet to a list for further
-    # # processing
-    # for tag in tags:
-    #     stim_list = glob.glob(os.path.join(data_dir,tag+'*.xls*'))
-    #     if stim_list != []:
-    #         for stim_data in stim_list:
-    #             stim_name = os.path.basename(stim_data).split('.')[0]
-    #             structural = glob.glob(os.path.join(data_dict['data folder'],tag+'.nii*'))[0]
-                
-    #             # If structural file name isn't valid
-                
-    #             # Else if stimulation file name isn't valid
-                
-    #             # If both are valid, add to the processing list
-                
-    #             # tag = subj name, stim_name = name of stimulation data, structural = nii*, stim_data = xls*
-    #             data_dict['data list'].append([tag,stim_name,structural, stim_data])
-    """
+            logging.debug('...'+str(nii)+' name invalid, must contain only A-Z, 0-9, _, and -')
     
     return data_dict['data list']
     

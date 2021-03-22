@@ -16,21 +16,6 @@ def main(tag, stim_data, data_dir, save_dir, file_t1, file_heatmap_nomask, file_
 #subject, data_dict, config_dict):
     
     # ~~~~~~SET UP VARIABLES~~~~~~
-    
-    # # save directory
-    # data_dir = str(data_dict['data folder'])
-    # save_dir = str(data_dict['save_dir'])
-    # # save prefix
-    # tag = subject[0]
-    # stim_data = subject[1]
-    # # structural file
-    # file_t1 = os.path.join(data_dir, subject[2])
-
-    # # standard space reference
-    # file_atlas = str(config_dict['atlas'])
-
-    logging.info('...normalization to standard atlas beginning!')
-    logging.info('...atlas chosen: '+file_atlas)
 
     # FLIRT section:
     # Register T1 image to MNI_152 template using FLIRT and FNIRT
