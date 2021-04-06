@@ -10,7 +10,7 @@ Created on Wed Feb 24 11:12:45 2021
 import os
 import logging
 from nipype.interfaces import fsl
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')    
+parent_logger = logging.getLogger('main')
 
 def main(tag, stim_data, data_dir, save_dir, file_t1, file_heatmap_nomask, file_atlas):
 #subject, data_dict, config_dict):

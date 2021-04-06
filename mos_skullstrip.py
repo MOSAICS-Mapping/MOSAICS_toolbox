@@ -14,7 +14,7 @@ deSCRIPTion:
 import os
 import logging
 from nipype.interfaces import fsl
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+parent_logger = logging.getLogger('main')
 
 def main(tag, file_t1, data_folder, save_dir):
     
@@ -30,7 +30,7 @@ def main(tag, file_t1, data_folder, save_dir):
             t1_stripped = bet.run()
             brainmask = os.path.join(save_dir,tag+'_brain_mask.nii.gz')
         else:
-            logging.info('... '+tag+'_brain_mask.nii.gz found in the data folder, we''ll use that.')
+            parent_logger.info('... '+tag+'_brain_mask.nii.gz found in the data folder, we''ll use that.')
             brainmask = bet_doublecheck            
     else:
        brainmask = bet_output

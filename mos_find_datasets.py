@@ -25,7 +25,7 @@ import re
 import glob
 import logging
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+parent_logger = logging.getLogger('main')
 
 def main(data_dict, config_dict):
     
@@ -64,13 +64,13 @@ def main(data_dict, config_dict):
                         stim_name = stim_match.group(1)
                         # if we have valid nii and xl files, append the info of this pair to a data processing list
                         data_dict['data list'].append([tag, stim_name, nii_match.string, stim_match.string])
-                        logging.debug('...'+nii_match.string+', '+stim_match.string+' are a matched pair. Added to processing list')
+                        parent_logger.debug('...'+nii_match.string+', '+stim_match.string+' are a matched pair. Added to processing list')
                     else:
-                        logging.debug('...'+str(stim_data)+' name invalid, must contain only A-Z, 0-9, _, and -')
+                        parent_logger.debug('...'+str(stim_data)+' name invalid, must contain only A-Z, 0-9, _, and -')
             else:
-                logging.debug('...no stimulation data found that matches '+nii_match.string+', moving on')
+                parent_logger.debug('...no stimulation data found that matches '+nii_match.string+', moving on')
         else:
-            logging.debug('...'+str(nii)+' name invalid, must contain only A-Z, 0-9, _, and -')
+            parent_logger.debug('...'+str(nii)+' name invalid, must contain only A-Z, 0-9, _, and -')
     
     return data_dict['data list']
     

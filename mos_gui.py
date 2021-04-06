@@ -16,11 +16,16 @@ import tkinter.messagebox as messagebox
 from PIL import ImageTk
 from pathlib import PurePath, Path
 
+from queue import Queue, Empty
+from threading import Thread
+
 import mos_main
 import mos_find_datasets
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logging.disable(logging.DEBUG)
+main_logger = logging.getLogger('main')
+
+#logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+#logging.disable(logging.DEBUG)
 
 # Find where a file is depending on whether we are running code from the package app (frozen)
 # or in development mode (not-frozen), in which case this is based on the terminal work dir
@@ -45,67 +50,93 @@ class MOSAICSapp(tk.Tk):
     
     # ~~~~~~ Initialization functions (created to declutter __init__)
     def app_layout(self):
-        # ~~~~~~Configure GUI appearance~~~~~~
+        
+        # ~~~~~~Baseline GUI appearance (size, parent frames)~~~~~~
         self.title("MOSAICS Toolbox")
         
         # Dimensions and placement of gui window
-        gui_w = 800
-        gui_h = 512
+        gui_w = 950
+        gui_h = 625
         screen_w = self.winfo_screenwidth()
         screen_h = self.winfo_screenheight()
         x = (screen_w/2) - (gui_w/2)
         y = (screen_h/2) - (gui_h/2)
         self.geometry('%dx%d+%d+%d' % (gui_w, gui_h, x, y))
+        # self.resizable(False,False)       
         
-        self.resizable(False,False)       
+        # Create baseline GUI frames
         self.buttons = tk.Frame(self) # bg="blue"
-        self.logo = tk.Frame(self) # bg="red        
-        self.buttons.pack(side=tk.LEFT, expand=False, fill=tk.BOTH, padx=10, pady=10)
-        self.logo.pack(side=tk.RIGHT, expand=True, fill=tk.BOTH, padx=10, pady=10)
-                
+        self.graphics = tk.Frame(self)
+        self.logger = tk.Frame(self)
+        
+        # Arrange GUI Frames     
+        self.buttons.grid(row=0, column=0, rowspan=4, columnspan=1, sticky="nsew", padx=10)
+        self.graphics.grid(row=0, column=1, rowspan=3, columnspan=4, sticky="nsew")
+        self.logger.grid(row=3, column=1, rowspan=1, columnspan=4, sticky="nsew")
+
+        for r in range(4):
+            self.rowconfigure(r, weight=1)
+        for c in range(5):
+            self.columnconfigure(c, weight=1)
+        
+        # ~~~~~~ BBACKGROUND GRAPHICS FRAME ~~~~~~
+        # Add MOSAICS logo to self.graphics Frame
         global img #important so that path to our file doesn't get wiped byPython cleanup
         background_image = resource_path("include/1_crop.png")
         img = ImageTk.PhotoImage(file=background_image)
         width, height = 512, 475
-        self.background = tk.Canvas(self.logo)
+
+        self.background = tk.Canvas(self.graphics)
         self.background.pack(expand="yes", fill="both")
         self.background.create_image(width/2, height/2, image=img, anchor="center")
         
-        # ~~~~~~Create and arrange GUI buttons~~~~~~
+        # ~~~~~~ BUTTONS FRAME ~~~~~~
         # select data button
         self.button_select = tk.Button(self.buttons,
                                        text="Select data",
                                        pady=5,
                                        width=15,
                                        command=self.call_gui_select) # only works if gui_select isn't already open
-        self.button_select.grid(row=1,pady=10)
-        
         # configure analysis button
         self.button_configure_analysis = tk.Button(self.buttons,
                                                    text="Configure processing",
                                                    pady=5,
                                                    width=15,
                                                    command=self.call_gui_configure)
-        self.button_configure_analysis.grid(row=2,pady=10)
-        
         # MOSIACS analysis button
         self.button_analysis = tk.Button(self.buttons,
                                          text="MOSAICS analysis",
                                          pady=5,
                                          width=15,
-                                         command=self.call_mosaics)
-        self.button_analysis.grid(row=3,pady=10)
-        
+                                         command=self.call_mosaics_threaded)
         self.button_close = tk.Button(self.buttons,
                                       text="Close GUI",
                                       pady=5,
                                       width=10,
                                       command=self.close_app)
-        self.button_close.grid(row=4,pady=10)
         
+        # ~~~~~~Arrange buttons in Button frame (left)~~~~~~
+        self.button_select.grid(row=1,pady=10)
+        self.button_configure_analysis.grid(row=2,pady=10)
+        self.button_analysis.grid(row=3,pady=10)
+        self.button_close.grid(row=4,pady=10)
         # center buttons with empty top and bottom rows that are greedy for space.
         self.buttons.grid_rowconfigure(0, weight=1)
         self.buttons.grid_rowconfigure(4, weight=1)        
+        
+        # ~~~~~~ LOGGING FRAME ~~~~~~
+        self.logger_text = tk.Text(self.logger,
+                                   state="disabled",
+                                   relief="groove",
+                                   borderwidth=2,
+                                   wrap="word",
+                                   height=3)
+        self.logger_scrollbar = tk.Scrollbar(self.logger,
+                                             command=self.logger_text.yview)
+        self.logger_text.config(yscrollcommand=self.logger_scrollbar.set)
+
+        self.logger_text.pack(side=tk.LEFT,fill=tk.BOTH,expand=True)
+        self.logger_scrollbar.pack(side=tk.RIGHT,fill=tk.Y)
         
     def declare_dicts(self):
         
@@ -142,7 +173,7 @@ class MOSAICSapp(tk.Tk):
                                         self.configure_dict)
             center_to_win(self.gui_select_master)
         else:
-            logging.error('Cannot open selection dialogue, window already exists!')
+            main_logger.error('Cannot open selection dialogue, window already exists!')
 
     def call_gui_configure(self):
         if self.configure_dict['config gui open'] == None:
@@ -152,10 +183,24 @@ class MOSAICSapp(tk.Tk):
                                         self.configure_dict)
             center_to_win(self.gui_config_master)
         else:
-            logging.error('Cannot open configure dialogue, window already exists!')
+            main_logger.error('Cannot open configure dialogue, window already exists!')
 
-    def call_mosaics(self):
-        mos_main.main(self.data_dict, self.configure_dict)
+    # def call_mosaics(self):
+    #     mos_main.main(self.data_dict, self.configure_dict)
+
+    def call_mosaics_threaded(self):
+        
+        processing_thread = AsyncProcessing(self.data_dict, self.configure_dict)
+        if processing_thread.running == False:
+            self.button_analysis['state'] = tk.DISABLED
+            processing_thread.start()
+            self.monitor_thread(processing_thread)
+        
+    def monitor_thread(self, thread):
+        if thread.is_alive():
+            self.after(100, lambda: self.monitor_thread(thread))
+        else:
+            self.button_analysis['state'] = tk.NORMAL
 
     def close_gui_select(self):
         self.gui_select_master.destroy()
@@ -264,7 +309,7 @@ class guiSelect(tk.Toplevel):
         # update save field to reflect a default 'outputs' folder unless user changes below
         self.path_save.config(text=os.path.join('...'+p.anchor,p.name,'outputs'))
         self.local_data['save_dir'] = os.path.join(data_folder, 'outputs')
-        # logging.info(self.local_data['save dir'])
+        # main_logger.info(self.local_data['save dir'])
         
         # bring this value back to the main GUI right away, so it's not lost due to scope
         self.local_data['data folder'] = data_folder
@@ -272,7 +317,7 @@ class guiSelect(tk.Toplevel):
         # make a list of all datasets in this folder, stored as data_dict['data list'] within this function
         self.local_data['data list'] = mos_find_datasets.main(self.local_data, self.config_dict)
         
-        logging.info('...'+str(len(self.local_data['data list']))+' subjects found for processing in your chosen folder.')
+        main_logger.info('...'+str(len(self.local_data['data list']))+' subjects found for processing in your chosen folder.')
 
     def set_save_dir(self):
         save_dir = filedialog.askdirectory(initialdir=self.local_data['save_dir'],
@@ -298,7 +343,7 @@ class guiSelect(tk.Toplevel):
         
         if settings_error == False:
             self.local_data['data list'] = mos_find_datasets.main(self.local_data, self.config_dict)
-            logging.info('...double checking data folder, '+str(len(self.local_data['data list']))+' subjects found for processing.')
+            main_logger.info('...double checking data folder, '+str(len(self.local_data['data list']))+' subjects found for processing.')
             self.window.destroy()
             self.local_data['select gui open'] = None
         
@@ -500,6 +545,35 @@ class guiConfigure(tk.Toplevel):
             self.local_data['config gui open'] = None
             self.window.destroy()
 
+class LogHandler(logging.StreamHandler):
+    def __init__(self, textctrl):
+        logging.StreamHandler.__init__(self) # initialize parent
+        self.textctrl = textctrl
+        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        self.setFormatter(formatter)
+
+    def emit(self, record):
+        msg = self.format(record)
+        self.textctrl.config(state="normal")
+        self.textctrl.insert("end", msg + "\n")
+        self.textctrl.see("end")
+        self.flush()
+        self.textctrl.config(state="disabled")
+
+class AsyncProcessing(Thread):
+    
+    def __init__(self, root_data_dict, root_config_dict):
+        super().__init__()
+        self.running = False
+        
+        self.local_data = root_data_dict
+        self.local_config = root_config_dict
+        
+    def run(self):
+        self.running = True
+        mos_main.main(self.local_data, self.local_config)
+        self.running = False
+
 def center_to_win(window):
     window.wm_withdraw()
     window.update()
@@ -513,14 +587,15 @@ def center_to_win(window):
     window.wm_deiconify()
 
 def main():
+        
     MOS = MOSAICSapp()
 
-    # width = MOS.winfo_screenwidth() # width of the screen
-    # height = MOS.winfo_screenheight() # height of the screen
-    # x = (width/2) - 400
-    # y = (heights/2) - 256
-    
-    # MOS.geometry('%dx%d+%d+%d' % (w, h, x, y))
+    stderrHandler = logging.StreamHandler() # no arguments -> stderr
+    main_logger.addHandler(stderrHandler)
+    guiHandler = LogHandler(MOS.logger_text)
+    main_logger.addHandler(guiHandler)
+    main_logger.setLevel(logging.INFO)
+    main_logger.info('Welcome to MOSAICS! Messages from the toolbox will be logged here.')
     
     MOS.mainloop()
 
