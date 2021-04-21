@@ -18,8 +18,8 @@ parent_logger = logging.getLogger('main')
 
 def main(tag, file_t1, data_folder, save_dir):
     
-    bet_output =  os.path.join(save_dir,tag+'_brain_mask.nii.gz')
-    bet_doublecheck = os.path.join(data_folder,tag+'_brain_mask.nii.gz')
+    bet_output =  os.path.join(save_dir,tag+'_brain.nii.gz')
+    bet_doublecheck = os.path.join(data_folder,tag+'_brain.nii.gz')
     if not os.path.isfile(bet_output):
         if not os.path.isfile(bet_doublecheck):
             bet = fsl.BET()

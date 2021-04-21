@@ -15,12 +15,14 @@ import tkinter.filedialog as filedialog
 import tkinter.messagebox as messagebox
 from PIL import ImageTk
 from pathlib import PurePath, Path
+import subprocess
 
 from queue import Queue, Empty
 from threading import Thread
 
-import mos_main
+import mos_analysis_main
 import mos_find_datasets
+import mos_analysis_group
 
 main_logger = logging.getLogger('main')
 
@@ -56,7 +58,7 @@ class MOSAICSapp(tk.Tk):
         
         # Dimensions and placement of gui window
         gui_w = 950
-        gui_h = 625
+        gui_h = 700
         screen_w = self.winfo_screenwidth()
         screen_h = self.winfo_screenheight()
         x = (screen_w/2) - (gui_w/2)
@@ -71,8 +73,8 @@ class MOSAICSapp(tk.Tk):
         
         # Arrange GUI Frames     
         self.buttons.grid(row=0, column=0, rowspan=4, columnspan=1, sticky="nsew", padx=10)
-        self.graphics.grid(row=0, column=1, rowspan=3, columnspan=4, sticky="nsew")
-        self.logger.grid(row=3, column=1, rowspan=1, columnspan=4, sticky="nsew")
+        self.graphics.grid(row=0, column=1, rowspan=3, columnspan=4, sticky="nsew", pady=(10,0))
+        self.logger.grid(row=3, column=1, rowspan=1, columnspan=4, sticky="nsew", pady=(0,15))
 
         for r in range(4):
             self.rowconfigure(r, weight=1)
@@ -104,11 +106,21 @@ class MOSAICSapp(tk.Tk):
                                                    width=15,
                                                    command=self.call_gui_configure)
         # MOSIACS analysis button
-        self.button_analysis = tk.Button(self.buttons,
+        self.button_analysis_main = tk.Button(self.buttons,
                                          text="MOSAICS analysis",
                                          pady=5,
                                          width=15,
-                                         command=self.call_mosaics_threaded)
+                                         command=self.call_main_analysis_threaded)
+        self.button_analysis_group = tk.Button(self.buttons,
+                                               text="Group-wise analysis",
+                                               pady=5,
+                                               width=15,
+                                               command=self.call_group_analysis_threaded)
+        self.button_view = tk.Button(self.buttons,
+                                     text="Launch MRIcroGL",
+                                     pady=5,
+                                     width=15,
+                                     command=self.view_results_threaded)
         self.button_close = tk.Button(self.buttons,
                                       text="Close GUI",
                                       pady=5,
@@ -118,11 +130,13 @@ class MOSAICSapp(tk.Tk):
         # ~~~~~~Arrange buttons in Button frame (left)~~~~~~
         self.button_select.grid(row=1,pady=10)
         self.button_configure_analysis.grid(row=2,pady=10)
-        self.button_analysis.grid(row=3,pady=10)
-        self.button_close.grid(row=4,pady=10)
+        self.button_analysis_main.grid(row=3,pady=10)
+        self.button_analysis_group.grid(row=4,pady=10)
+        self.button_view.grid(row=5,pady=10)
+        self.button_close.grid(row=6,pady=10)
         # center buttons with empty top and bottom rows that are greedy for space.
         self.buttons.grid_rowconfigure(0, weight=1)
-        self.buttons.grid_rowconfigure(4, weight=1)        
+        self.buttons.grid_rowconfigure(7, weight=1)        
         
         # ~~~~~~ LOGGING FRAME ~~~~~~
         self.logger_text = tk.Text(self.logger,
@@ -143,6 +157,8 @@ class MOSAICSapp(tk.Tk):
         self.data_dict = dict()
         self.data_dict['data select text'] = "No data specified"
         # self.data_dict['stim_flip'] = tk.IntVar(self) # tk.Checkbutton in gui_select
+        self.data_dict['brainmask check'] = tk.IntVar(self) # default is 0
+        self.data_dict['brainmask suffix'] = '_brain_mask.nii.gz'
         self.data_dict['stim_coords_list'] = ["Brainsight", "Nifti"]
         self.data_dict['stim_coords'] = tk.StringVar(self)
         self.data_dict['stim_coords'].set(self.data_dict['stim_coords_list'][0])
@@ -150,14 +166,13 @@ class MOSAICSapp(tk.Tk):
         self.data_dict['save_prefix'] = 'outputs'
         self.data_dict['data list'] = list()
         self.data_dict['select gui open'] = None
+        self.data_dict['grid spacing'] = 7
         
         self.configure_dict = dict()
         # Set default variables for analysis, updated by guiConfigure class as desired
         self.configure_dict['dilate'] = 3
         self.configure_dict['smooth'] = 7
         self.configure_dict['MEP_threshold'] = 0
-        self.configure_dict['brainmask check'] = tk.IntVar(self) # default is 0
-        self.configure_dict['brainmask suffix'] = '_brain_mask.nii.gz'
         self.configure_dict['normalize'] = tk.IntVar(self) # default is 0
         self.configure_dict['atlas'] = resource_path('include/MNI152_T1_1mm.nii.gz')
         self.configure_dict['atlas mask'] = resource_path('include/MNI152_T1_1mm_brain_mask.nii.gz')
@@ -171,7 +186,7 @@ class MOSAICSapp(tk.Tk):
             self.gui_select = guiSelect(self.gui_select_master,
                                         self.data_dict,
                                         self.configure_dict)
-            center_to_win(self.gui_select_master)
+            CenterToWin(self.gui_select_master)
         else:
             main_logger.error('Cannot open selection dialogue, window already exists!')
 
@@ -181,27 +196,76 @@ class MOSAICSapp(tk.Tk):
             self.gui_config_master.protocol("WM_DELETE_WINDOW", self.close_gui_config)
             self.gui_config = guiConfigure(self.gui_config_master,
                                         self.configure_dict)
-            center_to_win(self.gui_config_master)
+            CenterToWin(self.gui_config_master)
         else:
             main_logger.error('Cannot open configure dialogue, window already exists!')
 
     # def call_mosaics(self):
     #     mos_main.main(self.data_dict, self.configure_dict)
 
-    def call_mosaics_threaded(self):
+    def call_main_analysis_threaded(self):
         
-        processing_thread = AsyncProcessing(self.data_dict, self.configure_dict)
-        if processing_thread.running == False:
-            self.button_analysis['state'] = tk.DISABLED
-            processing_thread.start()
-            self.monitor_thread(processing_thread)
+        main_processing_thread = MainAsyncProcessing(self.data_dict, self.configure_dict)
+        if main_processing_thread.running == False:
+            self.button_analysis_main['state'] = tk.DISABLED
+            main_processing_thread.start()
+            self.monitor_thread_main(main_processing_thread)
         
-    def monitor_thread(self, thread):
+    def call_group_analysis_threaded(self):
+        group_processing_thread = GroupAsyncProcessing(self.data_dict, self.configure_dict)
+        if group_processing_thread.running == False:
+            self.button_analysis_group['state'] = tk.DISABLED
+            group_processing_thread.start()
+            self.monitor_thread_group(group_processing_thread)
+            
+    def view_results_threaded(self):
+        view_processing_thread = ViewAsyncProcessing()
+        if view_processing_thread.running == False:
+            self.button_view['state'] = tk.DISABLED
+            view_processing_thread.start()
+            self.monitor_thread_viewer(view_processing_thread)
+        
+    def monitor_thread_main(self, thread):
         if thread.is_alive():
-            self.after(100, lambda: self.monitor_thread(thread))
+            self.after(100, lambda: self.monitor_thread_main(thread))
         else:
-            self.button_analysis['state'] = tk.NORMAL
+            self.button_analysis_main['state'] = tk.NORMAL
+            
+    def monitor_thread_group(self, thread):
+        if thread.is_alive():
+            self.after(100, lambda: self.monitor_thread_group(thread))
+        else:
+            self.button_analysis_group['state'] = tk.NORMAL
+            
+    def monitor_thread_viewer(self, thread):
+        if thread.is_alive():
+            self.after(100, lambda: self.monitor_thread_viewer(thread))
+        else:
+            self.button_view['state'] = tk.NORMAL
 
+    def view_results(self):
+        
+        main_logger.info('...Launching MRIcroGL')
+
+        # Debugging section below -----
+        # tag = 'LCT1'
+        # img_brain = os.path.join(self.data_dict['save_dir'], tag, tag+'_brain.nii.gz')
+        # img_responses = os.path.join(self.data_dict['save_dir'], tag, tag+'_responses.nii.gz')
+        # img_heatmap = os.path.join(self.data_dict['save_dir'], tag, tag+'_heatmap.nii.gz')
+
+        # main_logger.info(img_brain)
+        # main_logger.info(img_responses)
+        # main_logger.info(img_heatmap)
+        # Debugging section above -----
+
+        # open a window that asks which person, from the data folder, you want to view?
+        # 3 radio buttons:
+        # option 1: dropdown menu with the list of tags from the data folder
+        # option 2: cycle through the list above
+        # option 3: the group-average template on the MNI brain
+
+        subprocess.call(['./include/MRIcroGL.app/Contents/MacOS/MRIcroGL','-s','mos_viewer_launch.py'])
+        
     def close_gui_select(self):
         self.gui_select_master.destroy()
         self.data_dict['select gui open'] = None
@@ -230,7 +294,7 @@ class guiSelect(tk.Toplevel):
         self.window = master
         
         self.gui_select_layout()
-        #center_to_win(self, master)
+        #CenterToWin(self, master)
 
     def gui_select_layout(self):
         self.window.title("Select data")
@@ -241,33 +305,58 @@ class guiSelect(tk.Toplevel):
         self.frame.pack(padx=10,pady=5)
         
         # ~~~~~~CONFIGURE GUI OBJECTS (BUTTONS ETC)~~~~~~
-        self.path_t1 = tk.Label(self.frame,
+        self.data_label = tk.Label(self.frame,
+                                   text="Data folder: ")
+        self.data_path = tk.Label(self.frame,
                             text=self.local_data['data select text'],
                             bg="white",
-                            width=30,
+                            width=20, #30
                             relief="groove",
                             borderwidth=2)
-        self.select_t1 = tk.Button(self.frame,
+        self.data_select = tk.Button(self.frame,
                               text="Select data folder",
                               command = self.find_data)
         
-        # self.flip_stim = tk.Checkbutton(self.frame,text="Stimulation coordinate system:",
-        #                                      variable=self.local_data['stim_flip'])  
-        self.flip_stim_label = tk.Label(self.frame, text="Stim. data coordinate system: ")
+        # checkbox: specify your own brainmask?
+        self.brainmask_label = tk.Label(self.frame,
+                                        text="Brainmask suffix: ")
+        self.brainmask_check = tk.Checkbutton(self.frame, 
+                                              text="Custom suffix",
+                                              variable=self.local_data['brainmask check'],
+                                              command=self.mask_check)
+        # entry field for brainmask suffix if user wants to change it
+        self.brainmask_suffix = tk.Entry(self.frame,
+                                         relief="groove",
+                                         justify='center')
+        self.brainmask_suffix.delete(0, tk.END)
+        self.brainmask_suffix.insert(0, self.local_data['brainmask suffix'])
+       # set brainmask check button and entry field depending upon its current value
+        if self.local_data['brainmask check'].get() == 1:
+            self.brainmask_check.select()
+            self.brainmask_suffix.config(state='normal')
+        elif self.local_data['brainmask check'].get() == 0:
+            self.brainmask_check.deselect()
+            self.brainmask_suffix.config(state='readonly')    
+        # specify whether stimulation data is in Brainsight or Nifti coordinate system
+        self.flip_stim_label = tk.Label(self.frame, text="Stimulation coordinate system: ")
         self.flip_stim_opts = tk.OptionMenu(self.frame, self.local_data['stim_coords'], *self.local_data['stim_coords_list'])
         self.flip_stim_opts.config(width=8)
+        # set grid spacing (7mm for SPORT)
+        self.gridspace_label = tk.Label(self.frame,
+                                 text="Grid spacing (mm):")
+        self.gridspace_form = tk.Entry(self.frame,
+                                      width=5,
+                                      relief="groove",
+                                      justify="center")
+        self.gridspace_form.insert(0,str(self.local_data['grid spacing']))
         
-        # # set flip_stim check button depending upon its current value
-        # if self.local_data['stim_flip'].get() == 1:
-        #     self.flip_stim.select()
-        # elif self.local_data['stim_flip'].get() == 0:
-        #     self.flip_stim.deselect()
-            
         save_text = os.path.normpath(self.local_data['save_dir'])
+        self.save_label = tk.Label(self.frame,
+                                   text="Output folder: ")
         self.path_save = tk.Label(self.frame,
                             text='...'+save_text.split(os.sep)[-2]+os.sep+save_text.split(os.sep)[-1],
                             bg="white",
-                            width=30,
+                            width=20, #30
                             relief="groove",
                             borderwidth=2)
         self.select_save = tk.Button(self.frame,
@@ -275,25 +364,30 @@ class guiSelect(tk.Toplevel):
                                 command = self.set_save_dir)
         
         self.close_button = tk.Button(self.frame,
-                                  text="Submit",
+                                  text="Save",
                                   command = self.save_and_close)
 
+        # GRID ARRANGEMENT AND CONFIG BELOW    
+        self.data_label.grid(row=0, column=0, columnspan=1, pady = (5,2), sticky="e")
+        self.data_path.grid(row=0, column=1, columnspan=2, pady = (5,2), sticky="w")
+        self.data_select.grid(row=0, column=3, columnspan=1, sticky="w")
+        self.brainmask_label.grid(row=1, column=0, columnspan=1, sticky="e")
+        self.brainmask_suffix.grid(row=1, column=1, columnspan=2, sticky="w")
+        self.brainmask_check.grid(row=1, column=3, columnspan=1, sticky="w")
+        self.flip_stim_label.grid(row=2, column=0, columnspan=1, sticky="e")
+        self.flip_stim_opts.grid(row=2, column=1, columnspan=1, sticky="w")
+        self.gridspace_label.grid(row=3, column=0, columnspan=1, sticky="e")
+        self.gridspace_form.grid(row=3, column=1, columnspan=1, sticky="w")
+        self.save_label.grid(row=4, column=0, columnspan=1, pady=2, sticky="e")
+        self.path_save.grid(row=4, column=1, columnspan=2, pady=2, sticky="w")
+        self.select_save.grid(row=4,column=3, columnspan=1, sticky="w")
+        self.close_button.grid(row=5, column=3, columnspan=1, pady=(8,0), sticky="w")
+
         # configure the grid
-        self.frame.columnconfigure((0,1,2), weight=0)
-        self.frame.rowconfigure((0,1,2,3,4,5,6), weight=0)
-        
-        # arrange assets
-        self.path_t1.grid(row=0, pady = (5,2), columnspan=3, sticky="w")
-        self.select_t1.grid(row=1, column=0, sticky="w")
-
-        # self.flip_stim.grid(row=2, column=0, pady=10, sticky="w")
-        self.flip_stim_label.grid(row=2, column=0, pady=10, sticky="w")
-        self.flip_stim_opts.grid(row=2, column=1, pady=10, sticky="w")
-
-        self.path_save.grid(row=3, column=0, pady=2, columnspan=3, sticky="w")
-        self.select_save.grid(row=4,column=0, sticky="w")
-
-        self.close_button.grid(row=5, column=1, pady=(8,0), sticky="e")
+        for r in range(6):
+            self.frame.rowconfigure(r, weight=1)
+        for c in range(4):
+            self.frame.columnconfigure(c, weight=1)
         
     def find_data(self):
 
@@ -303,13 +397,12 @@ class guiSelect(tk.Toplevel):
         
         # update the text field to reflect user chosen folder
         p = PurePath(data_folder)
-        self.path_t1.config(text=os.path.join('...'+p.anchor,p.name))
+        self.data_path.config(text=os.path.join('...'+p.anchor,p.name))
         self.local_data['data select text'] = os.path.join('...'+p.anchor+p.name)
         
         # update save field to reflect a default 'outputs' folder unless user changes below
         self.path_save.config(text=os.path.join('...'+p.anchor,p.name,'outputs'))
         self.local_data['save_dir'] = os.path.join(data_folder, 'outputs')
-        # main_logger.info(self.local_data['save dir'])
         
         # bring this value back to the main GUI right away, so it's not lost due to scope
         self.local_data['data folder'] = data_folder
@@ -318,6 +411,12 @@ class guiSelect(tk.Toplevel):
         self.local_data['data list'] = mos_find_datasets.main(self.local_data, self.config_dict)
         
         main_logger.info('...'+str(len(self.local_data['data list']))+' subjects found for processing in your chosen folder.')
+
+    def mask_check(self):
+        if self.local_data['brainmask check'].get() == 1:
+            self.brainmask_suffix.config(state='normal')
+        elif self.local_data['brainmask check'].get() == 0:
+            self.brainmask_suffix.config(state='readonly')
 
     def set_save_dir(self):
         save_dir = filedialog.askdirectory(initialdir=self.local_data['save_dir'],
@@ -344,6 +443,9 @@ class guiSelect(tk.Toplevel):
         if settings_error == False:
             self.local_data['data list'] = mos_find_datasets.main(self.local_data, self.config_dict)
             main_logger.info('...double checking data folder, '+str(len(self.local_data['data list']))+' subjects found for processing.')
+            
+            self.local_data['grid spacing'] = self.gridspace_form.get()
+            
             self.window.destroy()
             self.local_data['select gui open'] = None
         
@@ -372,7 +474,7 @@ class guiConfigure(tk.Toplevel):
         # ~~~ Establish all of the buttons in this form ~~~
         # entry field for dilation
         self.dilate_label = tk.Label(self.frame,
-                                     text="Stim. data dilation (mm):")
+                                     text="Stimulation dilation (mm):")
         self.dilate_form = tk.Entry(self.frame,
                                     width=5,
                                     relief="groove",
@@ -397,27 +499,6 @@ class guiConfigure(tk.Toplevel):
                                  justify='center')
         self.MEP_form.insert(0,str(self.local_data['MEP_threshold']))
         
-        # checkbox for: specify your own brainmask?
-        self.brainmask_check = tk.Checkbutton(self.frame, 
-                                              text="Providing your own brain mask?",
-                                              variable=self.local_data['brainmask check'],
-                                              command=self.mask_check)
-        
-        # entry field for brainmask suffix if user wants to change it
-        self.brainmask_suffix = tk.Entry(self.frame,
-                                         relief="groove",
-                                         justify='center')
-        self.brainmask_suffix.delete(0, tk.END)
-        self.brainmask_suffix.insert(0, self.local_data['brainmask suffix'])
-        
-       # set brainmask check button and entry field depending upon its current value
-        if self.local_data['brainmask check'].get() == 1:
-            self.brainmask_check.select()
-            self.brainmask_suffix.config(state='normal')
-        elif self.local_data['brainmask check'].get() == 0:
-            self.brainmask_check.deselect()
-            self.brainmask_suffix.config(state='readonly')
-        
         # checkbox for normalise or no?
         self.normalise_bool = tk.Checkbutton(self.frame,
                                              text="Warp to standard atlas?",
@@ -434,7 +515,7 @@ class guiConfigure(tk.Toplevel):
                                         text="./include/"+str(os.path.basename(self.local_data['atlas'])),
                                         relief="groove",
                                         borderwidth=2,
-                                        width=22)
+                                        width=35)
         self.normalise_atlas_select = tk.Button(self.frame,
                                                 text="Choose standard atlas:",
                                                 state='disabled',
@@ -445,7 +526,7 @@ class guiConfigure(tk.Toplevel):
                                         text="./include/"+str(os.path.basename(self.local_data['atlas mask'])),
                                         relief="groove",
                                         borderwidth=2,
-                                        width=30)
+                                        width=35)
         self.atlas_mask_select = tk.Button(self.frame,
                                                 text="Choose standard atlas mask:",
                                                 state='disabled',
@@ -453,35 +534,31 @@ class guiConfigure(tk.Toplevel):
         
         self.bg_init = self.normalise_atlas_select.cget("background")
         self.close_button = tk.Button(self.frame,
-                                      text="Submit",
+                                      text="Save",
                                       command = self.save_and_close)
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         
+
+        # GRID ARRANGEMENT AND CONFIGURE BELOW
+        self.dilate_label.grid(row=1,column=0, columnspan=1, sticky="e")
+        self.dilate_form.grid(row=1,column=1, columnspan=1, sticky="w")
+        self.smooth_label.grid(row=2,column=0, columnspan=1, sticky="e")
+        self.smooth_form.grid(row=2,column=1, columnspan=1, sticky="w")
+        self.MEP_label.grid(row=3,column=0, columnspan=1, sticky="e")
+        self.MEP_form.grid(row=3,column=1, columnspan=1, sticky="w")
+
+        self.normalise_bool.grid(row=4, column=1, columnspan=1, sticky="w")
+        self.normalise_atlas_select.grid(row=5, columnspan=1,column=0, padx=2, sticky="e")
+        self.normalise_atlas.grid(row=5,column=1, columnspan=1, sticky="w")
+        self.atlas_mask_select.grid(row=6, column=0, columnspan=1, padx=2, sticky="e")
+        self.atlas_mask.grid(row=6,column=1,pady=5, columnspan=1, sticky="w")
+        self.close_button.grid(row=7,column=1, columnspan=1, sticky="w")
+
         # configure the grid
-        self.frame.columnconfigure((0,1), weight=0)
-        self.frame.rowconfigure(0, weight=1)
-        self.frame.rowconfigure(6, weight=1)
-        # pack buttons in a grid!
-        self.dilate_label.grid(row=1,column=0)
-        self.dilate_form.grid(row=1,column=1,sticky="w")
-        self.smooth_label.grid(row=2,column=0)
-        self.smooth_form.grid(row=2,column=1,sticky="w")
-        self.MEP_label.grid(row=3,column=0)
-        self.MEP_form.grid(row=3,column=1,sticky="w")
-        self.brainmask_check.grid(row=4, column=0, sticky="w")
-        self.brainmask_suffix.grid(row=4, column=1, sticky="w")
-        self.normalise_bool.grid(row=5, column=0)
-        self.normalise_atlas_select.grid(row=6,column=0)
-        self.normalise_atlas.grid(row=6,column=1, sticky="w")
-        self.atlas_mask_select.grid(row=7,column=0,pady=5)
-        self.atlas_mask.grid(row=7,column=1,pady=5, sticky="w")
-        self.close_button.grid(row=8,column=1)
-    
-    def mask_check(self):
-        if self.local_data['brainmask check'].get() == 1:
-            self.brainmask_suffix.config(state='normal')
-        elif self.local_data['brainmask check'].get() == 0:
-            self.brainmask_suffix.config(state='readonly')
+        for r in range(8):
+            self.frame.rowconfigure(r, weight=1)
+        for c in range(2):
+            self.frame.columnconfigure(c, weight=1)
         
     def warp_check(self):
         if self.local_data['normalize'].get() == 0:
@@ -508,7 +585,7 @@ class guiConfigure(tk.Toplevel):
         file_atlas_mask = filedialog.askopenfilename(initialdir=str(Path.home()),
                                                 title="Select standard atlas mask (*.nii, *.nii.gz)",
                                                 filetypes=(("Nifti", ".nii"), ("Compressed Nifti", ".nii.gz"), ("All files", "*.*")))
-        p = PurePath(file_atlas)
+        p = PurePath(file_atlas_mask)
         self.atlas_mask.config(text=os.path.join('...'+p.anchor,p.name))
         # bring this value back to the main GUI right away, so it's not lost due to scope
         self.local_data['atlas mask'] = file_atlas_mask
@@ -520,6 +597,8 @@ class guiConfigure(tk.Toplevel):
         
         # update dilate
         self.local_data['dilate'] = self.dilate_form.get()
+        # update smooth
+        self.local_data['smooth'] = self.smooth_form.get()
 
         # if int(self.local_data['dilate'])%2 != 1 or int(self.local_data['dilate']) < 0:
         #     settings_error = True
@@ -534,16 +613,61 @@ class guiConfigure(tk.Toplevel):
         # update MEP threshold
         self.local_data['MEP_threshold'] = self.MEP_form.get()
         
-        # update brainmask suffix
-        if self.local_data['brainmask check'].get() == 1:
-            self.local_data['brainmask suffix'] = self.brainmask_suffix.get()        
-        
         # ['normalize'] is already set each time the button is checked / unchecked
         # ['atlas'] already set, or updated when selected in self.select_atlas()
         
         if settings_error == False:
             self.local_data['config gui open'] = None
             self.window.destroy()
+
+class guiViewSetup(tk.Toplevel):
+    
+    def __init__(self, master):
+        
+        self.master = master
+        #super().__init__(self.master) <--- not sure if I need this, it was in some example code
+        # self.local_data = root_configure_dict
+        
+        self.local_data['viewer gui open'] = True
+                
+        self.window = master
+        
+        self.gui_viewer_setup_layout()
+        
+    def gui_viewer_setup_layout(self):
+        self.window.title("Select data")
+        # self.window.geometry("300x210")
+        
+        self.window.resizable(False,False)
+        self.frame = tk.Frame(self.window)
+        self.frame.pack(padx=10,pady=5)
+        
+        # ~~~~~~CONFIGURE GUI OBJECTS (BUTTONS ETC)~~~~~~
+        self.data_path = tk.Label(self.frame,
+                            text=self.local_data['data select text'],
+                            bg="white",
+                            width=30,
+                            relief="groove",
+                            borderwidth=2)
+        self.data_select = tk.Button(self.frame,
+                              text="Select data folder",
+                              command = self.find_data)
+        
+        self.close_button = tk.Button(self.frame,
+                                  text="Submit",
+                                  command = self.save_and_close)
+        
+        # arrange assets
+        self.data_path.grid(row=0, column=0, columnspan=3, pady = (5,2), sticky="w")
+        self.data_select.grid(row=1, column=0, columnspan=1, sticky="w")
+
+        self.close_button.grid(row=6, column=1, columnspan=1, pady=(8,0), sticky="e")
+
+        # configure the grid
+        for r in range(7):
+            self.frame.rowconfigure(r, weight=1)
+        for c in range(3):
+            self.frame.columnconfigure(c, weight=1)
 
 class LogHandler(logging.StreamHandler):
     def __init__(self, textctrl):
@@ -560,7 +684,7 @@ class LogHandler(logging.StreamHandler):
         self.flush()
         self.textctrl.config(state="disabled")
 
-class AsyncProcessing(Thread):
+class MainAsyncProcessing(Thread):
     
     def __init__(self, root_data_dict, root_config_dict):
         super().__init__()
@@ -571,10 +695,43 @@ class AsyncProcessing(Thread):
         
     def run(self):
         self.running = True
-        mos_main.main(self.local_data, self.local_config)
+        mos_analysis_main.main(self.local_data, self.local_config)
         self.running = False
 
-def center_to_win(window):
+class GroupAsyncProcessing(Thread):
+    
+    def __init__(self, root_data_dict, root_config_dict):
+        super().__init__()
+        self.running = False
+        
+        self.local_data = root_data_dict
+        self.config_dict = root_config_dict
+        
+    def run(self):
+        self.running = True
+        mos_analysis_group.main(self.local_data, self.config_dict)
+        self.running = False
+
+class ViewAsyncProcessing(Thread):
+    
+    def __init__(self):
+        super().__init__()
+        self.running = False
+        
+    def run(self):
+        self.running = True
+        
+        main_logger.info('...Launching MRIcroGL')
+        
+        mricro_app = resource_path("include/Contents/MacOS/MRIcroGL")
+        viewer_launch_script = resource_path("mos_viewer_launch.py")
+        
+        subprocess.call([mricro_app,'-s',viewer_launch_script])
+        
+        # mos_analysis_group.main(self.local_data)
+        self.running = False
+
+def CenterToWin(window):
     window.wm_withdraw()
     window.update()
     x = window.master.winfo_x()
