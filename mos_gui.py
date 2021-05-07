@@ -360,7 +360,7 @@ class guiSelect(tk.Toplevel):
                             relief="groove",
                             borderwidth=2)
         self.select_save = tk.Button(self.frame,
-                                text="Select save directory",
+                                text="Change save directory",
                                 command = self.set_save_dir)
         
         self.close_button = tk.Button(self.frame,
