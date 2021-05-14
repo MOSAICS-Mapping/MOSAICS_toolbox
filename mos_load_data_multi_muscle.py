@@ -35,6 +35,22 @@ def main(file_nibs_map):
     
     for column in data_nibs_map.columns:
         
+        # future way to do this, when I'm looking back and look at the lazy, non-universal solution here:
+            # Just iterate over DataFrame.columns, now this is an example in which you will end up with a list of column names that match:
+            
+            # import pandas as pd
+            
+            # data = {'spike-2': [1,2,3], 'hey spke': [4,5,6], 'spiked-in': [7,8,9], 'no': [10,11,12]}
+            # df = pd.DataFrame(data)
+            
+            # spike_cols = [col for col in df.columns if 'spike' in col]
+            # print(list(df.columns))
+            # print(spike_cols)
+            # Output:
+            
+            # ['hey spke', 'no', 'spike-2', 'spiked-in']
+            # ['spike-2', 'spiked-in']
+        
         # If this column name has MEP in it, store it and skip the rest
         if 'MEP' in column:
             
@@ -54,15 +70,18 @@ def main(file_nibs_map):
             if muscle_name+'_responsive' in data_nibs_map.columns:
                 # responsive_colname = muscle_name+'_responsive'
                 responsive_column = data_nibs_map[muscle_name+'_responsive']
+            elif muscle_name+'_responsive ' in data_nibs_map.columns:
+                responsive_column = data_nibs_map[muscle_name+'_responsive ']
             elif 'responsive_'+muscle_name in data_nibs_map.columns:
                 # responsive_colname = 'responsive_'+muscle_name
                 responsive_column = data_nibs_map['responsive_'+muscle_name]
             else:
                 # build a column of responsive or not
                 # start with all zeroes
+                parent_logger.info('...no column marking responsive MEP sites for '+muscle_name+', making our own for non-zero MEPs')
                 responsive_column = np.zeros(len(MEP_column))
                 # for each stimulated point, if the MEP is not zero, responsiveness column is 1
-                for count, value in enumerate(responsive_column):
+                for count, value in enumerate(MEP_column):
                     if value != 0:
                         responsive_column[count] = 1        
             
@@ -101,7 +120,7 @@ def main(file_nibs_map):
         
     if error_check == 0:
         # Second error check good, too. Output a logging message so we know how many muscles we'll be processing
-        parent_logger.info('...Found data for '+str(len(muscles_dict))+' to process')
+        parent_logger.info('...Found data for '+str(len(muscles_dict))+' muscles to process')
         parent_logger.info('...'+str(len(locs_dict['X']))+' stimulation coordinate sets found')
 
         # Pass this list back to the main script?

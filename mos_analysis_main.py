@@ -156,7 +156,6 @@ def main(data_dict, config_dict):
                 file_grid = os.path.join(save_dir,stim_file+'_'+muscle+'_grid.nii.gz')
                 file_samples = os.path.join(save_dir,stim_file+'_'+muscle+'_samples.nii.gz')
                 file_responses = os.path.join(save_dir,stim_file+'_'+muscle+'_responses.nii.gz')
-                file_responses_out = os.path.join(save_dir,stim_file+'_'+muscle+'_responses_out.nii.gz')
                 # Noscale (below) is the initial heatmap, gets warped to standard space used
                 file_heatmap_ps_initial = os.path.join(save_dir,stim_file+'_'+muscle+'_heatmap_initial.nii')
                 # Nomask includes weighted MEP values for heatmap, and is masked by fsl.ApplyMask() on line ~237
@@ -281,13 +280,13 @@ def main(data_dict, config_dict):
                 # MAP AREA:
                 #number of spots where a responsive MEP was observed
                 nonzero_responses = np.count_nonzero(map_samples)
-                ps_map_area = nonzero_responses * grid_spacing
+                ps_map_area = nonzero_responses * (grid_spacing ** 2)
                 
                 # MAP VOLUME:
                 ps_map_volume = 0
                 # for all non-zero values (non-zero MEPs) in our array of mapped regions
                 for i in map_samples[np.nonzero(map_samples)]:
-                    ps_map_volume = ps_map_volume + (i * grid_spacing)
+                    ps_map_volume = ps_map_volume + (i * (grid_spacing ** 2))
     
     
                 # ~~~~~~REPEAT RELEVANT STEPS IF DATA NORMALIZED~~~~~~        

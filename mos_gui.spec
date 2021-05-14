@@ -3,7 +3,7 @@ import sys ; sys.setrecursionlimit(sys.getrecursionlimit() * 5)
 block_cipher = None
 
 
-a = Analysis(['mos_gui.py'],
+a = Analysis(['/Users/Bryce/Desktop/Postdoc_Scripts/GitHub/04_mosaics_2020/mos_gui.py'],
              pathex=['/Users/Bryce/Desktop/Postdoc_Scripts/GitHub/04_mosaics_2020'],
              binaries=[],
              datas=[('/Users/Bryce/Desktop/Postdoc_Scripts/GitHub/04_mosaics_2020/include/1_crop.png', './include'),
@@ -36,4 +36,8 @@ exe = EXE(pyz,
           upx=True,
           upx_exclude=[],
           runtime_tmpdir=None,
-          console=True )
+          console=False )
+app = BUNDLE(exe,
+             name='MOSAICS.app',
+             icon=None,
+             bundle_identifier=None)
