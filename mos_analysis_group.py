@@ -7,13 +7,6 @@ Created on Fri Feb 26 14:25:09 2021
 
 --- deSCRIPTION ---
 
-1. Get a list of all the people to process              - CHECK
-2. Fslmaths to mean all heatmaps (in standard space)    - CHECK
-    - Heatmaps have to be in standard space             - CHECK
-3. Calculate hotspot and COM                            - CHECK
-4. Calculate distance to hotspot for each individual    - CHECK
-5. Save this information                                - 
-    - put it in a 'group' subfolder within '/outputs'
 
 """
 
@@ -26,80 +19,100 @@ from nibabel.affines import apply_affine
 from scipy.spatial import distance
 import pandas as pd
 
+import mos_load_data_multi_muscle
+
 parent_logger = logging.getLogger('main')
 
 def main(data_dict, config_dict):
     
-    save_dir_parent = data_dict['save_dir']
     file_atlas = str(config_dict['atlas'])
+    save_dir_parent = data_dict['save_dir']
+    save_dir_group = save_dir_parent+'/Group_analysis/'
+    os.makedirs(save_dir_group,exist_ok=True)
     
-    # heatmap list = a list of all subjects who have '_warped_heatmap' in their outputs folder
-    heatmap_data = construct_heatmap_list(data_dict)
-    heatmap_list = heatmap_data[0]
-    heatmap_tags = heatmap_data[1]
+    # heatmap list = a list of all subjects who have muscle+'_warped_heatmap' in their outputs folder
+    muscle_heatmap_dict = construct_heatmap_list(data_dict, save_dir_parent)
+    output_spreadsheet = list()
+    #heatmap_list = heatmap_data[0]
     
-    if len(heatmap_list) <= 1:
-        parent_logger.error('...0 or 1 heatmaps found in standard space, cannot perform group-wide analysis')
-    else:
+    for key in muscle_heatmap_dict: # heatmap_dict has keys for each muscle name found in the stim spreadsheet
+                                    # and each key points to a list of all subject heatmaps for that muscle
+                                    # [0] = subject tag, [1] = path to subject's muscle heatmap
         
-        parent_logger.info('...MOSAICS group-wide analysis beginning, please wait.')
+        if len(muscle_heatmap_dict[key]) <= 1:
+            parent_logger.error('0 or 1 heatmaps found in standard space, cannot produce an averaged heatmap.')
+        else:
+            parent_logger.info('Producing mean heatmap for '+key+', '+str(len(muscle_heatmap_dict[key]))+' heatmaps found in subject output directories.')
         
-        # First, make a subfolder to save our group analysis results in
-        save_dir_group = save_dir_parent+'/Group_analysis/'
-        os.makedirs(save_dir_group,exist_ok=True)
+            # key is the muscle name.
+            heatmap_concatenated = os.path.join(save_dir_group, key+'_heatmaps_concatenated.nii.gz')
+            heatmap_group_average = os.path.join(save_dir_group, key+'_heatmaps_averaged.nii.gz')
         
-        heatmap_concatenated = os.path.join(save_dir_group, 'group_heatmaps_concatenated.nii.gz')
-        heatmap_group_average = os.path.join(save_dir_group,'group_heatmaps_averaged.nii.gz')
-        
-        # creates the two images listed directly above using Nipype FSL commands
-        parent_logger.info('...concatenating standard space heatmaps, and creating the group average map')
-        merge_and_mean(heatmap_list, heatmap_concatenated, heatmap_group_average)
+            if not os.path.isfile(heatmap_concatenated) and not os.path.isfile(heatmap_group_average):
+                parent_logger.info('Concatenating warped maps and producing an average '+key+' map')
+                merge_and_mean(muscle_heatmap_dict[key], heatmap_concatenated, heatmap_group_average)
+            else:
+                parent_logger.info('Concatenated and averaged heatmaps for '+key+' already produced')
 
-        #simple, load in averaged heatmap and use numpy / scipy methods to calculate these metrics
-        parent_logger.info('...calculating average map hotspot and center of mass')
-        averaged_metrics = calculate_group_average_metrics(heatmap_group_average, file_atlas)
-        average_hotspot = averaged_metrics[0]
-        average_com = averaged_metrics[1]
+            #simple, load in averaged heatmap and use numpy / scipy methods to calculate these metrics
+            parent_logger.info('Calculating average '+key+' map hotspot and center of mass')
+            averaged_metrics = calculate_group_average_metrics(heatmap_group_average, file_atlas)
+            average_hotspot = averaged_metrics[0]
+            average_com = averaged_metrics[1]
         
         # # distance between each subject and average hotspot
+        # parent_logger.debug('hotspot located at x: '+average_hotspot[0]+', y: '+average_hotspot[1]+', z: '+average_hotspot[2])
+        # parent_logger.debug(' center of mass located at x: '+average_com[0]+', y: '+average_com[1]+', z: '+average_com[2])    
 
-        # parent_logger.info('...hotspot located at x: '+hotspot[0]+', y: '+hotspot[1]+', z: '+hotspot[2])
-        # parent_logger.fino('... center of mass located at x: '+com[0]+', y: '+com[1]+', z: '+com[2])    
-    
-        # Calculate distance from each heatmap to group average heatmap hotspot + COM
-        parent_logger.info('...calculating distance from patient hotspot/COM to group average hotspot/COM')
-        distance_metrics = distance_to_average(heatmap_list, average_hotspot, average_com, file_atlas)
-        
-        # Save these values to an excel sheet?
-        parent_logger.info('...saving results spreadsheet in Group_analysis subfolder')
-        save_info(heatmap_list, heatmap_tags, distance_metrics, average_hotspot, average_com, save_dir_group)
+            # Calculate distance from each heatmap to group average heatmap hotspot + COM
+            parent_logger.info('Calculating euclidean distance from patient '+key+' hotspot/COM to group average '+key+' hotspot/COM')
+            distance_metrics = distance_to_average(muscle_heatmap_dict[key], average_hotspot, average_com, file_atlas)
 
-        parent_logger.info('...MOSAICS group analysis completed!')
+            # Save these values to an excel sheet?
+            store_info(key, muscle_heatmap_dict[key], distance_metrics, average_hotspot, average_com, output_spreadsheet)
 
-def construct_heatmap_list(data_dict):
-    
-    heatmap_list = list()
-    heatmap_tags = list()
-    
-    # data_list is a list of subejcts with nifti and xls files in a data directory
+    parent_logger.info('Saving groupwise results in Group_analysis subfolder')
+    print_spreadsheet(save_dir_group, output_spreadsheet)
+    parent_logger.info('MOSAICS group analysis completed!')
+
+def construct_heatmap_list(data_dict, save_dir_parent):
+       
+    # data_list is a list of subjects with nifti and xls files in a data directory
     data_list = data_dict['data list']
+    
+    muscle_heatmap_dict = dict()
     
     for subject in data_list:
         
-        # tag = subject[0]
-        stim_file = subject[1]
-        #save directory, including sub-directory for each subject
-        save_dir = str(data_dict['save_dir']+'/'+stim_file)
+        tag = subject[0]
+        file_nibs_map = os.path.join(data_dict['data folder'],subject[2]) #subject[2] is stim file name (in data folder)
         
-        file_heatmap_sd = os.path.join(save_dir,stim_file+'_warped_heatmap.nii.gz')
-        if os.path.exists(file_heatmap_sd):
-            heatmap_list.append(file_heatmap_sd)
-            heatmap_tags.append(stim_file)
-            
-    return heatmap_list, heatmap_tags
-    
-def merge_and_mean(heatmap_list, heatmap_concatenated, heatmap_group_average):
+        save_dir = save_dir_parent+'/'+tag
+        
+        stim_dict = mos_load_data_multi_muscle.main(file_nibs_map)
+        muscles_dict = stim_dict['muscles']
 
+        for muscle in muscles_dict:
+            # if the list for this muscle's heatmap doesn't exist yet, create the list
+            try:
+                muscle_heatmap_dict[muscle]
+            except KeyError:
+                muscle_heatmap_dict[muscle] = list()
+
+            file_heatmap_sd = os.path.join(save_dir,tag+'_'+muscle+'_warped_heatmap.nii.gz')
+            if os.path.exists(file_heatmap_sd):
+                muscle_heatmap_dict[muscle].append([tag, file_heatmap_sd])
+            
+    return muscle_heatmap_dict
+    
+def merge_and_mean(muscle_heatmaps, heatmap_concatenated, heatmap_group_average):
+
+    heatmap_list = list()
+    # heatmap_list is a list with two values per entry, first is the tag and
+    # second is the location of a warped heatmap for the muscle for that subject
+    for list_entry in muscle_heatmaps:
+        heatmap_list.append(list_entry[1])
+        
     merge_heatmaps = fsl.Merge()
     merge_heatmaps.inputs.in_files = heatmap_list
     merge_heatmaps.inputs.dimension = 't'
@@ -141,7 +154,13 @@ def calculate_group_average_metrics(heatmap_group_average, file_atlas):
 
     return average_hotspot, average_center_mass
 
-def distance_to_average(heatmap_list, average_hotspot, average_com, file_atlas):
+def distance_to_average(muscle_heatmaps, average_hotspot, average_com, file_atlas):
+    
+    heatmap_list = list()
+    # heatmap_list is a list with two values per entry, first is the tag and
+    # second is the location of a warped heatmap for the muscle for that subject
+    for list_entry in muscle_heatmaps:
+        heatmap_list.append(list_entry[1])
     
     distance_metrics = list()
     
@@ -188,9 +207,63 @@ def distance_to_average(heatmap_list, average_hotspot, average_com, file_atlas):
     # return the tuple
     return distance_metrics
 
-def save_info(heatmap_list, heatmap_tags, distance_metrics, average_hotspot, average_com, save_dir_group):
+def store_info(muscle, muscle_heatmaps, distance_metrics, average_hotspot, average_com, output_spreadsheet):
     
-    results_column_names = ['Subject tag',
+    heatmap_list = list()
+    heatmap_tags = list()
+    # heatmap_list is a list with two values per entry, first is the tag and
+    # second is the location of a warped heatmap for the muscle for that subject
+    for list_entry in muscle_heatmaps:
+        heatmap_tags.append(list_entry[0])
+        heatmap_list.append(list_entry[1])
+        
+    # ADDING DATA TO A DATAFRAME FOR LATER EXPORT TO SPREADSHEET
+    # For column order, see print_spreadsheet function below   
+    
+    # If this is the first time we're adding to the list or first time adding
+    # data for a muscle, add the group-average data also
+    if output_spreadsheet == [] or output_spreadsheet[-1][0] != muscle:
+        output_spreadsheet.append([muscle,
+                                   'Mean group map',
+                                    round(average_hotspot[0][0],0),
+                                    round(average_hotspot[0][1],0),
+                                    round(average_hotspot[0][2],0),
+                                    round(average_com[0][0],2),
+                                    round(average_com[0][1],2),
+                                    round(average_com[0][2],2),
+                                    0,
+                                    0])
+    
+    # if len(output_spreadsheet) == 0:
+    #     output_spreadsheet.append([muscle,
+    #                                'Mean group map',
+    #                                 round(average_hotspot[0][0],0),
+    #                                 round(average_hotspot[0][1],0),
+    #                                 round(average_hotspot[0][2],0),
+    #                                 round(average_com[0][0],2),
+    #                                 round(average_com[0][1],2),
+    #                                 round(average_com[0][2],2),
+    #                                 0,
+    #                                 0])
+    
+    for index in range(0,len(heatmap_list)):
+        
+        measures_list = [muscle,
+                         heatmap_tags[index],
+                         distance_metrics[index][0][0][0],
+                         distance_metrics[index][0][0][1],
+                         distance_metrics[index][0][0][2],
+                         round(distance_metrics[index][1][0][0],2),
+                         round(distance_metrics[index][1][0][1],2),
+                         round(distance_metrics[index][1][0][2],2),                         
+                         round(distance_metrics[index][2],2),
+                         round(distance_metrics[index][3],2)]
+        output_spreadsheet.append(measures_list)
+
+def print_spreadsheet(save_dir_group, output_spreadsheet):
+    
+    results_column_names = ['Muscle',
+                            'Subject',
                             'Hotspot X',
                             'Hotspot Y',
                             'Hotspot Z',
@@ -200,32 +273,8 @@ def save_info(heatmap_list, heatmap_tags, distance_metrics, average_hotspot, ave
                             'Dist. to group hotspot',
                             'Dist. to group COM']
     
-    results_metrics_list = list()
-    results_metrics_list.append(['Mean group map',
-                                round(average_hotspot[0][0],0),
-                                round(average_hotspot[0][1],0),
-                                round(average_hotspot[0][2],0),
-                                round(average_com[0][0],2),
-                                round(average_com[0][1],2),
-                                round(average_com[0][2],2),
-                                0,
-                                0])
-    
-    for index in range(0,len(heatmap_list)):
-        
-        measures_list = [heatmap_tags[index],
-                         distance_metrics[index][0][0][0],
-                         distance_metrics[index][0][0][1],
-                         distance_metrics[index][0][0][2],
-                         round(distance_metrics[index][1][0][0],2),
-                         round(distance_metrics[index][1][0][1],2),
-                         round(distance_metrics[index][1][0][2],2),                         
-                         round(distance_metrics[index][2],2),
-                         round(distance_metrics[index][3],2)]
-        results_metrics_list.append(measures_list)
-
     # ~~~~~~print values to spreadsheet after the loop has completed~~~~~~
-    metrics_dataframe = pd.DataFrame(results_metrics_list, columns=results_column_names)    
+    metrics_dataframe = pd.DataFrame(output_spreadsheet, columns=results_column_names)    
     measures_file = os.path.join(save_dir_group,'cohort_mapping_results.xlsx')
     metrics_dataframe.to_excel(measures_file)
 

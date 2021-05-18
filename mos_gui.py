@@ -245,7 +245,7 @@ class MOSAICSapp(tk.Tk):
 
     def view_results(self):
         
-        main_logger.info('...Launching MRIcroGL')
+        main_logger.info('Launching MRIcroGL')
 
         # Debugging section below -----
         # tag = 'LCT1'
@@ -410,7 +410,7 @@ class guiSelect(tk.Toplevel):
         # make a list of all datasets in this folder, stored as data_dict['data list'] within this function
         self.local_data['data list'] = mos_find_datasets.main(self.local_data, self.config_dict)
         
-        main_logger.info('...'+str(len(self.local_data['data list']))+' subjects found for processing in your chosen folder.')
+        main_logger.info(''+str(len(self.local_data['data list']))+' subjects found for processing in your chosen folder.')
 
     def mask_check(self):
         if self.local_data['brainmask check'].get() == 1:
@@ -442,7 +442,7 @@ class guiSelect(tk.Toplevel):
         
         if settings_error == False:
             self.local_data['data list'] = mos_find_datasets.main(self.local_data, self.config_dict)
-            main_logger.info('...double checking data folder, '+str(len(self.local_data['data list']))+' subjects found for processing.')
+            main_logger.info('double checking data folder, '+str(len(self.local_data['data list']))+' subjects found for processing.')
             
             self.local_data['grid spacing'] = self.gridspace_form.get()
             
@@ -721,7 +721,7 @@ class ViewAsyncProcessing(Thread):
     def run(self):
         self.running = True
         
-        main_logger.info('...Launching MRIcroGL')
+        main_logger.info('Launching MRIcroGL')
         
         mricro_app = resource_path("include/Contents/MacOS/MRIcroGL")
         viewer_launch_script = resource_path("mos_viewer_launch.py")

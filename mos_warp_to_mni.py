@@ -12,7 +12,7 @@ import logging
 from nipype.interfaces import fsl
 parent_logger = logging.getLogger('main')
 
-def main(tag, muscle, stim_data, data_dir, save_dir, file_t1, file_heatmap_nomask, file_atlas):
+def main(tag, muscle, data_dir, save_dir, file_t1, file_heatmap_nomask, file_atlas):
 #subject, data_dict, config_dict):
     
     # ~~~~~~SET UP VARIABLES~~~~~~
@@ -43,8 +43,8 @@ def main(tag, muscle, stim_data, data_dir, save_dir, file_t1, file_heatmap_nomas
     # rather than that and a BET mask
     heatmap_applyxfm.inputs.in_file = file_heatmap_nomask
     heatmap_applyxfm.inputs.in_matrix_file = os.path.join(save_dir,tag+'_warped_omat.mat')
-    heatmap_applyxfm.inputs.out_file = os.path.join(save_dir,stim_data+'_'+muscle+'_warped_heatmap.nii.gz')
-    heatmap_applyxfm.inputs.out_matrix_file = os.path.join(save_dir,stim_data+'_'+muscle+'_heatmap_flirt.mat')
+    heatmap_applyxfm.inputs.out_file = os.path.join(save_dir,tag+'_'+muscle+'_warped_heatmap.nii.gz')
+    heatmap_applyxfm.inputs.out_matrix_file = os.path.join(save_dir,tag+'_'+muscle+'_heatmap_flirt.mat')
     heatmap_applyxfm.inputs.reference = file_atlas
     heatmap_applyxfm.inputs.apply_xfm = True
     result = heatmap_applyxfm.run()

@@ -78,7 +78,7 @@ def main(file_nibs_map):
             else:
                 # build a column of responsive or not
                 # start with all zeroes
-                parent_logger.info('...no column marking responsive MEP sites for '+muscle_name+', making our own for non-zero MEPs')
+                parent_logger.info('no column marking responsive MEP sites for '+muscle_name+', making our own for non-zero MEPs')
                 responsive_column = np.zeros(len(MEP_column))
                 # for each stimulated point, if the MEP is not zero, responsiveness column is 1
                 for count, value in enumerate(MEP_column):
@@ -112,16 +112,16 @@ def main(file_nibs_map):
             if len(muscles_dict[muscle][0]) == len(locs_dict['X']):
                 pass
             else:
-                parent_logger.error('...'+muscle+' MEP column length does not match stimulation coordinate column length')
+                parent_logger.error(''+muscle+' MEP column length does not match stimulation coordinate column length')
                 error_check = 1
     else:
-        parent_logger.error('...X, Y, and Z stimulation coordinate columns do not have the same amount of data points')
+        parent_logger.error('X, Y, and Z stimulation coordinate columns do not have the same amount of data points')
         error_check = 1
         
     if error_check == 0:
         # Second error check good, too. Output a logging message so we know how many muscles we'll be processing
-        parent_logger.info('...Found data for '+str(len(muscles_dict))+' muscles to process')
-        parent_logger.info('...'+str(len(locs_dict['X']))+' stimulation coordinate sets found')
+        parent_logger.info('Found data for '+str(len(muscles_dict))+' muscles to process')
+        parent_logger.info(''+str(len(locs_dict['X']))+' stimulation coordinate sets found')
 
         # Pass this list back to the main script?
         stim_dict = dict()

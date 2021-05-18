@@ -61,16 +61,15 @@ def main(data_dict, config_dict):
                     # probably unnecessary: check if xls* file has only alphanumeric, _, or -
                     stim_match = valid_xl_regex.search(stim_data)
                     if stim_match != None:
-                        stim_name = stim_match.group(1)
                         # if we have valid nii and xl files, append the info of this pair to a data processing list
-                        data_dict['data list'].append([tag, stim_name, nii_match.string, stim_match.string])
-                        parent_logger.debug('...'+nii_match.string+', '+stim_match.string+' are a matched pair. Added to processing list')
+                        data_dict['data list'].append([tag, nii_match.string, stim_match.string])
+                        parent_logger.debug(''+nii_match.string+', '+stim_match.string+' are a matched pair. Added to processing list')
                     else:
-                        parent_logger.debug('...'+str(stim_data)+' name invalid, must contain only A-Z, 0-9, _, and -')
+                        parent_logger.debug(''+str(stim_data)+' name invalid, must contain only A-Z, 0-9, _, and -')
             else:
-                parent_logger.debug('...no stimulation data found that matches '+nii_match.string+', moving on')
+                parent_logger.debug('no stimulation data found that matches '+nii_match.string+', moving on')
         else:
-            parent_logger.debug('...'+str(nii)+' name invalid, must contain only A-Z, 0-9, _, and -')
+            parent_logger.debug(''+str(nii)+' name invalid, must contain only A-Z, 0-9, _, and -')
     
     return data_dict['data list']
     

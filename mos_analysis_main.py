@@ -41,7 +41,7 @@ def main(data_dict, config_dict):
 
     if len(data_list) != 0:
     
-        parent_logger.info('...MOSAICS main analysis beginning, please wait.')    
+        parent_logger.info('MOSAICS main analysis beginning, please wait.')    
         
         # # save directory
         save_dir_parent = str(data_dict['save_dir'])
@@ -90,20 +90,19 @@ def main(data_dict, config_dict):
             # tag = subj name, stim_name = name of stimulation data (everything before .xls(x) extension),
             # structural = nii*, stim_data = xls*
             tag = subject[0]
-            stim_file = subject[1]
     
-            file_t1 = os.path.join(data_folder,subject[2])
-            file_nibs_map = os.path.join(data_folder,subject[3])
+            file_t1 = os.path.join(data_folder,subject[1])
+            file_nibs_map = os.path.join(data_folder,subject[2])
             
             #save directory, including sub-directory for each subject
-            save_dir = str(data_dict['save_dir']+'/'+stim_file)
+            save_dir = str(data_dict['save_dir']+'/'+tag)
             
             # # Create output directory
             os.makedirs(save_dir,exist_ok=True)
             
             # ~~~~~~THINGS TO DO ONCE PER SUBJECT~~~~~~   
 
-            parent_logger.info('...processing '+tag+', stim data: '+file_nibs_map)
+            parent_logger.info('processing '+tag+', stim data: '+file_nibs_map)
         
             # ~~~~~~LOAD DATA~~~~~~
             # Read in a 1mm isotropic T1-weighted MRI .nii
@@ -120,7 +119,7 @@ def main(data_dict, config_dict):
                 elif os.path.isfile(os.path.join(save_dir, tag+data_dict['brainmask suffix'])):
                     ps_brainmask = os.path.abspath(os.path.join(save_dir, tag+data_dict['brainmask suffix']))
                 else:
-                    parent_logger.info('...performing BET skull stripping')
+                    parent_logger.info('performing BET skull stripping')
                     ps_brainmask = mos_skullstrip.main(tag, file_t1, data_folder, save_dir)
             elif data_dict['brainmask check'].get() == 1:
                 # if and elif check if brainmask exists in data folder and save dir (in that order)
@@ -130,8 +129,8 @@ def main(data_dict, config_dict):
                 elif os.path.isfile(os.path.join(save_dir, tag+data_dict['brainmask suffix'])):
                     ps_brainmask = os.path.abspath(os.path.join(save_dir, tag+data_dict['brainmask suffix']))
                 else:
-                    parent_logger.warning('...supplied brainmask not found, creating our own.')
-                    parent_logger.info('...performing BET skull stripping')
+                    parent_logger.warning('supplied brainmask not found, creating our own.')
+                    parent_logger.info('performing BET skull stripping')
                     ps_brainmask = mos_skullstrip.main(tag, file_t1, data_folder, save_dir)
             
 
@@ -150,19 +149,19 @@ def main(data_dict, config_dict):
             print()
             for muscle in muscles_dict:
                 
-                parent_logger.info('...processing '+muscle+' data')
+                parent_logger.info('processing '+muscle+' data')
                     
                 # establish save file names PER MUSCLE
-                file_grid = os.path.join(save_dir,stim_file+'_'+muscle+'_grid.nii.gz')
-                file_samples = os.path.join(save_dir,stim_file+'_'+muscle+'_samples.nii.gz')
-                file_responses = os.path.join(save_dir,stim_file+'_'+muscle+'_responses.nii.gz')
+                file_grid = os.path.join(save_dir,tag+'_'+muscle+'_grid.nii.gz')
+                file_samples = os.path.join(save_dir,tag+'_'+muscle+'_samples.nii.gz')
+                file_responses = os.path.join(save_dir,tag+'_'+muscle+'_responses.nii.gz')
                 # Noscale (below) is the initial heatmap, gets warped to standard space used
-                file_heatmap_ps_initial = os.path.join(save_dir,stim_file+'_'+muscle+'_heatmap_initial.nii')
+                file_heatmap_ps_initial = os.path.join(save_dir,tag+'_'+muscle+'_heatmap_initial.nii')
                 # Nomask includes weighted MEP values for heatmap, and is masked by fsl.ApplyMask() on line ~237
-                file_heatmap_ps_weighted = os.path.join(save_dir,stim_file+'_'+muscle+'_heatmap_weighted.nii')
+                file_heatmap_ps_weighted = os.path.join(save_dir,tag+'_'+muscle+'_heatmap_weighted.nii')
                 # Below variable is used on line 236
-                file_heatmap_ps_final = os.path.join(save_dir,stim_file+'_'+muscle+'_heatmap.nii.gz')
-                file_heatmap_sd = os.path.join(save_dir,stim_file+'_'+muscle+'_warped_heatmap.nii.gz')
+                file_heatmap_ps_final = os.path.join(save_dir,tag+'_'+muscle+'_heatmap.nii.gz')
+                file_heatmap_sd = os.path.join(save_dir,tag+'_'+muscle+'_warped_heatmap.nii.gz')
                 
                 # ~~~~~~SET UP STIM DATA ARRAYS~~~~~~
                 # Create an array of zeroes equal to size of T1 image, to initialize our output images
@@ -170,7 +169,7 @@ def main(data_dict, config_dict):
                 # What are these maps (below)?
                 #     - map_responses = MEP amplitude overlayed in an array the same size as the T1 image, dilated across 5 voxels
                 #       (so 5mm isotropic) in the script
-                #     - map_samples = the same as responses, but no dilation, so... 1mm isotropic?
+                #     - map_samples = the same as responses, but no dilation, so 1mm isotropic?
                 #     - map_grid = 'binary' mask, 0 or 99, which points had a stim? Originally 
                 #       also points orthogonally adjacent to each stim point are 1 instead of 99.
                 
@@ -198,7 +197,7 @@ def main(data_dict, config_dict):
                 #   - Not implemented yet. Helen has notes in Slack I have not read yet.
                     
                 # ~~~~~~DILATE STIMULATION DATA (MAP_RESPONSES)~~~~~~
-                parent_logger.info('...dilating stimulation coordinates by '+str(config_dict['dilate'])+' voxels')
+                parent_logger.info('dilating stimulation coordinates by '+str(config_dict['dilate'])+' voxels')
                 
                 if not os.path.isfile(file_responses):
                     map_responses_dilate = fsl.DilateImage()
@@ -209,7 +208,7 @@ def main(data_dict, config_dict):
                     map_responses_dilate.inputs.out_file = file_responses
                     map_responses_temp = map_responses_dilate.run()
                 else:
-                    parent_logger.info('...dilation already done, skipping this step')
+                    parent_logger.info('dilation already done, skipping this step')
                 
                 # Re-load the responses map, to receive the dilated version of the map
                 map_responses = nib.load(file_responses).get_fdata()
@@ -220,7 +219,7 @@ def main(data_dict, config_dict):
                 # RPS = +x is right, +y is posterior, +z is superior
                 # RAS = +x is right, +y is anterior, +z is superior
                 if data_dict['stim_coords'].get() == "Brainsight":
-                    parent_logger.info('...flipping coordinates of stimulations along anterior-posterior axis')
+                    parent_logger.info('flipping coordinates of stimulations along anterior-posterior axis')
                     map_responses = np.flip(map_responses,1)
                     map_samples = np.flip(map_samples,1)
                     map_grid = np.flip(map_grid,1)
@@ -229,13 +228,13 @@ def main(data_dict, config_dict):
                 # ~~~~~~PRODUCE HEATMAP~~~~~~
                 # Smooth the hotspot map using a 3D Gaussian
                 # Interestingly, FWHM = 2.355 * s.d. for Gaussian distribution, so divide smooth by 2.355 to get s.d.
-                parent_logger.info('...producing heatmap of responsive sites')
+                parent_logger.info('producing heatmap of responsive sites')
                 stdev_gaussian = smooth/2.355
                 map_heatmap_ps_initial = ndi.gaussian_filter(map_responses,stdev_gaussian,0,mode='reflect')
     
     
                 # ~~~~~~WEIGHT MEPs~~~~~~
-                parent_logger.info('...normalizing response map (by hotspot MEP)')
+                parent_logger.info('normalizing response map (by hotspot MEP)')
                 
                 MEP_ps_max, map_responses_weighted, map_heatmap_ps_weighted =\
                     normalize_ps_heatmap(map_heatmap_ps_initial, map_samples, map_responses)
@@ -246,7 +245,7 @@ def main(data_dict, config_dict):
                 #               Stimulations from experiment have been uniformaly dilated by the 'dilate' integer.
                 # Heatmap:      Stimulations map with a gaussian filter applied to smooth the data
                 
-                parent_logger.info('...saving stimulation sites (grid), responsive sites (responses), and heatmap (heatmap)')
+                parent_logger.info('saving stimulation sites (grid), responsive sites (responses), and heatmap (heatmap)')
                 save_map(file_grid, map_grid, data_T1)
                 save_map(file_responses, map_responses_weighted, data_T1)
                 save_map(file_heatmap_ps_initial, map_heatmap_ps_initial, data_T1)
@@ -260,7 +259,7 @@ def main(data_dict, config_dict):
                 # ~~~~~~MASK HEATMAP MAPS IN PATIENT SPACE~~~~~~
                 # Heatmap: apply brain mask to limit smoothing into skull / scalp
                 # native space mask application
-                parent_logger.info('...applying brainmask to patient-space heatmap')
+                parent_logger.info('applying brainmask to patient-space heatmap')
                 mask_heatmap(file_heatmap_ps_weighted, ps_brainmask, file_heatmap_ps_final)
             
                 
@@ -293,14 +292,14 @@ def main(data_dict, config_dict):
                 # Note this has to come after saving the initial files, as warps are applied to the heatmap
                 if config_dict['normalize'].get() == 1:
                     
-                    parent_logger.info('...normalizing heatmap to standard space (SD)')
+                    parent_logger.info('normalizing heatmap to standard space (SD)')
                     
                     # -- register and establish name of the warped map, for functions below
-                    parent_logger.info('...atlas chosen: '+file_atlas)
-                    mos_warp_to_mni.main(tag, muscle, stim_file, data_folder, save_dir, file_t1, file_heatmap_ps_weighted, file_atlas)
+                    parent_logger.info('atlas chosen: '+file_atlas)
+                    mos_warp_to_mni.main(tag, muscle, data_folder, save_dir, file_t1, file_heatmap_ps_weighted, file_atlas)
                     
                     # -- standard space mask application to heatmap
-                    parent_logger.info('...applying brainmask to standard-space heatmap')
+                    parent_logger.info('applying brainmask to standard-space heatmap')
                     mask_heatmap(file_heatmap_sd, str(config_dict['atlas mask']), file_heatmap_sd)
                     
                     # -- load in normalized heatmap to calculate some metrics
@@ -341,8 +340,8 @@ def main(data_dict, config_dict):
                     map_heatmap_sd_normal = (map_heatmap_warped / MEP_sd_smoothed) * 100
                     
                     # Overwrite previously warped, masked heatmap with a new, weighted MEP version
-                    # parent_logger.info('...weighting MEPs of standard-space heatmap')
-                    file_heatmap_sd_normal = os.path.join(save_dir,stim_file+'_warped_heatmap.nii.gz')
+                    # parent_logger.info('weighting MEPs of standard-space heatmap')
+                    file_heatmap_sd_normal = os.path.join(save_dir,tag+'_warped_heatmap.nii.gz')
                     nii_heatmap_sd_normal = nib.Nifti1Image(map_heatmap_sd_normal, data_heatmap_warped.affine)
                     nib.save(nii_heatmap_sd_normal, file_heatmap_sd_normal)
                     
@@ -384,9 +383,9 @@ def main(data_dict, config_dict):
                 results_metrics_list.append(measures_list)        
                 
                 #clean up files, put into a separate function, see if that helps track everything
-                file_cleanup(file_heatmap_ps_initial, file_heatmap_ps_weighted, save_dir, stim_file)
+                file_cleanup(file_heatmap_ps_initial, file_heatmap_ps_weighted, save_dir, tag)
                 
-                parent_logger.info('...analysis completed for '+tag+' '+muscle)
+                parent_logger.info('analysis completed for '+tag+' '+muscle)
                 print()
     
     
@@ -395,11 +394,11 @@ def main(data_dict, config_dict):
         measures_file = os.path.join(save_dir_parent,'mapping_results.xlsx')
         metrics_dataframe.to_excel(measures_file)
     
-        parent_logger.info('...MOSAICS main analysis completed successfully!')
+        parent_logger.info('MOSAICS main analysis completed successfully!')
         
     else:
         
-        parent_logger.error('...No subjects found for processing, MOSAICS processing not run')
+        parent_logger.error('No subjects found for processing, MOSAICS processing not run')
 
 # SUB-FUNCTIONS USED IN MAIN (SEPARATED FOR READABILITY / CLEANLINESS)
 #def initialize_stim_arrays(data_T1, data_nibs_map, MEP_thresh):
@@ -451,7 +450,7 @@ def save_map(filename, map, structural_data):
     
     nifti = nib.Nifti1Image(map, structural_data.affine)
     # if not os.path.exists(filename):
-    # parent_logger.info('...saving :'+filename)
+    # parent_logger.info('saving :'+filename)
     nib.save(nifti, filename)
 
 def mask_heatmap(input_map, brainmask, output_file):
@@ -462,13 +461,13 @@ def mask_heatmap(input_map, brainmask, output_file):
     apply_mask.inputs.out_file = output_file
     mask_result = apply_mask.run()
     
-def file_cleanup(file_heatmap_ps_initial, file_heatmap_ps_weighted, save_dir, stim_file):
+def file_cleanup(file_heatmap_ps_initial, file_heatmap_ps_weighted, save_dir, tag):
     # ~~~~~~CLEAN UP UNNECESSARY FILES~~~~~~
     os.remove(file_heatmap_ps_initial)
     os.remove(file_heatmap_ps_weighted)
     #os.remove(os.path.join(save_dir,tag+'_FLIRT_omat.mat'))
-    if os.path.isfile(os.path.join(save_dir,stim_file+'_heatmap_flirt.mat')):
-        os.remove(os.path.join(save_dir,stim_file+'_heatmap_flirt.mat'))
+    if os.path.isfile(os.path.join(save_dir,tag+'_heatmap_flirt.mat')):
+        os.remove(os.path.join(save_dir,tag+'_heatmap_flirt.mat'))
         # os.remove(file_heatmap_sd)
 
 if __name__ == '__main__':
