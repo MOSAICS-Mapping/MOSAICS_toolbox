@@ -32,7 +32,7 @@ import mos_load_data_multi_muscle
 
 parent_logger = logging.getLogger('main')
 
-def main(data_dict, config_dict):
+def main(data_dict, config_dict):  
 
     print()
     # ~~~~~~ SET UP GLOBAL VARIABLES ~~~~~~
@@ -102,6 +102,7 @@ def main(data_dict, config_dict):
             
             # ~~~~~~THINGS TO DO ONCE PER SUBJECT~~~~~~   
 
+            parent_logger.info('')
             parent_logger.info('processing '+tag+', stim data: '+file_nibs_map)
         
             # ~~~~~~LOAD DATA~~~~~~
@@ -146,7 +147,6 @@ def main(data_dict, config_dict):
             locs_dict = stim_dict['locs']
             muscles_dict = stim_dict['muscles'] # muscles_dict[0] = MEP data, [1] = responsive yes or no
             
-            print()
             for muscle in muscles_dict:
                 
                 parent_logger.info('processing '+muscle+' data')

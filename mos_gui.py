@@ -5,7 +5,7 @@ Created on Thu Jan 28 13:36:20 2021
 
 @author: Bryce
 
-Toolbox version: α - v1.1.2
+Toolbox version: α - v1.2.2
 """
 
 import os, sys
@@ -64,10 +64,11 @@ class MOSAICSapp(tk.Tk):
         x = (screen_w/2) - (gui_w/2)
         y = (screen_h/2) - (gui_h/2)
         self.geometry('%dx%d+%d+%d' % (gui_w, gui_h, x, y))
+        self.minsize(gui_w,gui_h)
         # self.resizable(False,False)       
         
         # Create baseline GUI frames
-        self.buttons = tk.Frame(self) # bg="blue"
+        self.buttons = tk.Frame(self) #, bg="blue"
         self.graphics = tk.Frame(self)
         self.logger = tk.Frame(self)
         
@@ -81,15 +82,16 @@ class MOSAICSapp(tk.Tk):
         for c in range(5):
             self.columnconfigure(c, weight=1)
         
-        # ~~~~~~ BBACKGROUND GRAPHICS FRAME ~~~~~~
+        # ~~~~~~ BACKGROUND GRAPHICS FRAME ~~~~~~
         # Add MOSAICS logo to self.graphics Frame
-        global img #important so that path to our file doesn't get wiped byPython cleanup
+        global img #important so that path to our file doesn't get wiped by Python cleanup
         background_image = resource_path("include/1_crop.png")
         img = ImageTk.PhotoImage(file=background_image)
         width, height = 512, 475
 
         self.background = tk.Canvas(self.graphics)
-        self.background.pack(expand="yes", fill="both")
+        #self.background.pack(expand="yes", fill="both")
+        self.background.place(relx=0.5,rely=0.5,anchor="center",width=width,height=height)
         self.background.create_image(width/2, height/2, image=img, anchor="center")
         
         # ~~~~~~ BUTTONS FRAME ~~~~~~
@@ -294,7 +296,6 @@ class guiSelect(tk.Toplevel):
         self.window = master
         
         self.gui_select_layout()
-        #CenterToWin(self, master)
 
     def gui_select_layout(self):
         self.window.title("Select data")
